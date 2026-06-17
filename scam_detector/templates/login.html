@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — ScamShield</title>
+  <meta name="description" content="Log in to your ScamShield account to access fake job detection tools." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body class="auth-page">
+
+  <div class="hero-bg-grid"></div>
+
+  <div class="auth-card">
+    <a href="/" class="auth-logo">
+      <img
+        src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}"
+        alt="Graphura Logo"
+        class="graphura-logo"
+      >
+      <span class="logo-text">ScamShield</span>
+    </a>
+
+    <h2 class="auth-title">Welcome Back</h2>
+    <p class="auth-subtitle">Verify job scams with Graphura's AI engine</p>
+
+    {% if error %}
+      <div class="auth-error">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <form class="auth-form" method="POST">
+      <div class="form-group">
+        <label for="username">Username / Email</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="Enter your username"
+          required
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="input-container">
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Enter your password"
+            required
+          >
+          <button type="button" class="password-toggle" id="passwordToggle" aria-label="Toggle Password Visibility">
+            👁️
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 8px; margin-bottom: 20px;">
+        <input type="checkbox" id="remember" name="remember" style="width: auto; margin: 0; cursor: pointer;">
+        <label for="remember" style="margin: 0; font-size: 0.85rem; color: var(--text-sub); cursor: pointer; user-select: none;">Remember Me</label>
+      </div>
+
+      <button type="submit" class="auth-btn">Log In</button>
+    </form>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="/signup">Sign Up</a>
+    </div>
+  </div>
+
+  <script>
+    const passwordInput = document.getElementById('password');
+    const passwordToggle = document.getElementById('passwordToggle');
+
+    if (passwordInput && passwordToggle) {
+      passwordToggle.addEventListener('click', () => {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        passwordToggle.textContent = type === 'password' ? '👁️' : '🙈';
+      });
+    }
+  </script>
+</body>
+</html>

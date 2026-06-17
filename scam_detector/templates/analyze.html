@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analyze Job — ScamShield by Graphura India</title>
+  <meta name="description" content="Paste any job or internship posting and let ScamShield's NLP + ML engine score it for fraud signals in real-time." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+{% include 'components/navbar.html' %}
+
+<!-- ── PAGE HERO ── -->
+<div class="hero-bg-grid"></div>
+<section class="page-hero">
+  <div class="container">
+    <div class="page-hero-inner">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        AI-Powered Analysis
+      </div>
+      <h1 class="page-hero-title">Analyze a Job Posting</h1>
+      <p class="page-hero-sub">Fill in whatever you have — more details = better accuracy. Our engine checks 40+ fraud signals.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── MODE TABS ── -->
+<section style="padding: 0 0 0 0;">
+  <div class="container">
+    <div style="display:flex; gap:12px; margin-bottom:0; border-bottom:1px solid var(--border); padding-bottom:0;">
+      <a href="/analyze-job" style="padding:10px 20px; font-size:0.88rem; font-weight:600; color:#a5b4fc; border-bottom:2px solid #6366f1; text-decoration:none;">📋 Analyze Job Text</a>
+      <a href="/offer-letter" style="padding:10px 20px; font-size:0.88rem; font-weight:600; color:var(--text-sub); border-bottom:2px solid transparent; text-decoration:none;">📄 Offer Letter Scanner</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── ANALYZER FORM ── -->
+<section class="analyzer-section" id="analyze">
+  <div class="container">
+    <div class="analyzer-wrapper">
+
+      <!-- LEFT — FORM -->
+      <div class="form-panel">
+        <div class="form-header">
+          <h2>Job Details</h2>
+          <p>Fill in whatever you have — more details = better accuracy</p>
+        </div>
+
+        <form id="analyzeForm" autocomplete="off">
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="job_title">Job Title <span class="required">*</span></label>
+              <input type="text" id="job_title" placeholder="e.g. Data Analyst Intern" required />
+            </div>
+            <div class="form-group">
+              <label for="company">Company Name</label>
+              <input type="text" id="company" placeholder="e.g. TechCorp India Pvt Ltd" />
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="location">Location</label>
+              <input type="text" id="location" placeholder="e.g. Remote / Mumbai" />
+            </div>
+            <div class="form-group">
+              <label for="salary">Monthly Salary (₹)</label>
+              <input type="number" id="salary" placeholder="e.g. 15000" min="0" />
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="experience">Experience Required (years)</label>
+              <input type="number" id="experience" placeholder="0 = Fresher" min="0" max="30" />
+            </div>
+            <div class="form-group">
+              <label for="url">Job Post URL</label>
+              <input type="url" id="url" placeholder="https://internshala.com/..." />
+              <span class="autofill-link" onclick="autoFillFromURL()">
+                <span id="autofillStatus">⚡ Fetch job details from this URL</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="job_description">Job Description <span class="required">*</span></label>
+            <textarea id="job_description" rows="8"
+              placeholder="Paste the complete job/internship description here...&#10;&#10;The more text you paste, the more accurate the analysis will be."
+              required></textarea>
+            <div class="char-counter"><span id="charCount">0</span> characters</div>
+          </div>
+
+          <!-- ── SKILLS PREVIEW ── -->
+          <div class="form-group" id="skillsPreviewGroup" style="display:none;">
+            <label style="margin-bottom:8px; display:block;">🧠 Skills Detected <span style="font-size:0.75rem; color:var(--text-sub); font-weight:400;">(auto-extracted — you can remove false positives)</span></label>
+            <div id="skillTagsContainer" style="display:flex; flex-wrap:wrap; gap:8px; min-height:42px; padding:10px 12px; background:rgba(99,102,241,0.05); border:1px solid var(--border); border-radius:10px; margin-bottom:10px; align-items:flex-start; align-content:flex-start;"></div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" id="manualSkillInput" placeholder="Type a skill and press Enter or Add..." style="flex:1; font-size:0.85rem;" />
+              <button type="button" id="addSkillBtn" class="clear-btn" style="padding:8px 16px; font-size:0.82rem; white-space:nowrap;" onclick="addManualSkill()">+ Add</button>
+            </div>
+          </div>
+
+          <!-- ── SUSPICIOUS SKILLS WARNING ── -->
+          <div id="suspiciousSkillsWarning" style="display:none; margin-bottom:4px; padding:12px 16px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:10px; color:#fca5a5; font-size:0.84rem; line-height:1.7;">
+            ⚠️ <strong>Suspicious skill signals detected:</strong> <span id="suspiciousSkillsWarningText" style="font-style:italic;"></span><br>
+            <span style="color:var(--text-sub); font-size:0.78rem;">These are common patterns in fake job postings.</span>
+          </div>
+
+          <!-- hidden field — synced before submit and sent to backend -->
+          <input type="hidden" id="skills" name="skills" value="" />
+
+          <div class="example-chips">
+            <span class="chips-label">Try an example:</span>
+            <button type="button" class="chip chip-scam" onclick="loadExample('scam')">⚠️ Scam Example</button>
+            <button type="button" class="chip chip-legit" onclick="loadExample('legit')">✅ Legit Example</button>
+          </div>
+
+          <div class="analyze-btn-row">
+            <button type="submit" class="analyze-btn" id="analyzeBtn">
+              <span class="btn-icon">🔍</span>
+              <span class="btn-text">Analyze Now</span>
+              <span class="btn-loader" style="display:none">
+                <span class="spinner"></span> Analyzing...
+              </span>
+            </button>
+            <button type="button" class="clear-btn" id="clearBtn" onclick="clearForm()">
+              ✕ Clear
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- RIGHT — LIVE ANALYSIS PANEL -->
+      <div class="results-panel" id="infoPanel">
+
+        <!-- IDLE STATE -->
+        <div class="results-idle" id="idleState">
+          <div class="idle-icon">🛡️</div>
+          <h3>Live Analysis Panel</h3>
+          <p>Submit the form to get your real-time fraud intelligence report</p>
+          <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(99,102,241,0.06); border-radius:10px; border:1px solid rgba(99,102,241,0.15);">
+              <span style="font-size:1.2rem;">🎯</span>
+              <div>
+                <div style="font-size:0.82rem; font-weight:600; color:var(--text-main);">Overall Risk Score</div>
+                <div style="font-size:0.75rem; color:var(--text-sub);">Weighted composite of all signals</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(99,102,241,0.06); border-radius:10px; border:1px solid rgba(99,102,241,0.15);">
+              <span style="font-size:1.2rem;">🌐</span>
+              <div>
+                <div style="font-size:0.82rem; font-weight:600; color:var(--text-main);">Domain Verification</div>
+                <div style="font-size:0.75rem; color:var(--text-sub);">Trust score for company URL</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(99,102,241,0.06); border-radius:10px; border:1px solid rgba(99,102,241,0.15);">
+              <span style="font-size:1.2rem;">💰</span>
+              <div>
+                <div style="font-size:0.82rem; font-weight:600; color:var(--text-main);">Salary Risk</div>
+                <div style="font-size:0.75rem; color:var(--text-sub);">Anomaly detection on compensation</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(99,102,241,0.06); border-radius:10px; border:1px solid rgba(99,102,241,0.15);">
+              <span style="font-size:1.2rem;">👤</span>
+              <div>
+                <div style="font-size:0.82rem; font-weight:600; color:var(--text-main);">Recruiter Assessment</div>
+                <div style="font-size:0.75rem; color:var(--text-sub);">AI evaluation of recruiter trust signals</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(99,102,241,0.06); border-radius:10px; border:1px solid rgba(99,102,241,0.15);">
+              <span style="font-size:1.2rem;">🚩</span>
+              <div>
+                <div style="font-size:0.82rem; font-weight:600; color:var(--text-main);">Detected Indicators</div>
+                <div style="font-size:0.75rem; color:var(--text-sub);">Matched fraud keywords & red flags</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOADING STATE -->
+        <div id="analysisLoading" style="display:none; text-align:center; padding:40px 20px;">
+          <div style="font-size:3rem; margin-bottom:16px;">⚙️</div>
+          <h3 style="color:var(--text-main); margin-bottom:8px;">Analyzing...</h3>
+          <p style="color:var(--text-sub); font-size:0.87rem;">Running ML pipeline, domain check, and Groq AI</p>
+        </div>
+
+        <!-- RESULTS STATE -->
+        <div id="analysisResults" style="display:none;">
+
+          <!-- Risk Score Header -->
+          <div id="liveVerdictBadge" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; padding:14px 18px; border-radius:14px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2);">
+            <div>
+              <div style="font-size:0.72rem; color:#a5b4fc; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px;">VERDICT</div>
+              <div id="liveVerdictText" style="font-size:1rem; font-weight:700; color:var(--text-main);">—</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:0.72rem; color:var(--text-sub); margin-bottom:3px;">RISK SCORE</div>
+              <div id="liveRiskScore" style="font-size:1.8rem; font-weight:800; color:#a5b4fc;">—</div>
+            </div>
+          </div>
+
+          <!-- Score bars -->
+          <div style="margin-bottom:16px; padding:14px 16px; background:var(--card); border-radius:12px; border:1px solid var(--border);">
+            <div style="font-size:0.75rem; color:var(--text-sub); font-weight:600; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.04em;">📊 Risk Breakdown</div>
+            <div class="breakdown-item" style="margin-bottom:8px;">
+              <div class="breakdown-label"><span>🔑 Keywords</span><span id="liveKwScore">—</span></div>
+              <div class="bar-track"><div class="bar-fill bar-red" id="liveKwBar" style="width:0%"></div></div>
+            </div>
+            <div class="breakdown-item" style="margin-bottom:8px;">
+              <div class="breakdown-label"><span>🌐 Domain</span><span id="liveDomScore">—</span></div>
+              <div class="bar-track"><div class="bar-fill bar-orange" id="liveDomBar" style="width:0%"></div></div>
+            </div>
+            <div class="breakdown-item" style="margin-bottom:8px;">
+              <div class="breakdown-label"><span>💰 Salary</span><span id="liveSalScore">—</span></div>
+              <div class="bar-track"><div class="bar-fill bar-yellow" id="liveSalBar" style="width:0%"></div></div>
+            </div>
+            <div class="breakdown-item">
+              <div class="breakdown-label"><span>🤖 NLP</span><span id="liveNlpScore">—</span></div>
+              <div class="bar-track"><div class="bar-fill bar-purple" id="liveNlpBar" style="width:0%"></div></div>
+            </div>
+            <div class="breakdown-item" id="liveSkillsRow" style="display:none; margin-top:8px;">
+              <div class="breakdown-label"><span>🧠 Skills</span><span id="liveSkillsScore">—</span></div>
+              <div class="bar-track"><div class="bar-fill bar-red" id="liveSkillsBar" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <!-- Recruiter Assessment -->
+          <div id="liveRecruiterAssessment" style="display:none; margin-bottom:16px; padding:12px 16px; background:var(--card); border-radius:12px; border:1px solid var(--border);">
+            <div style="font-size:0.75rem; color:var(--text-sub); font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.04em;">👤 Recruiter Assessment</div>
+            <p id="liveRecruiterText" style="color:var(--text-main); font-size:0.84rem; line-height:1.6; margin:0;"></p>
+          </div>
+
+          <!-- Detected Keywords -->
+          <div id="liveKeywordsSection" style="display:none; margin-bottom:16px; padding:12px 16px; background:var(--card); border-radius:12px; border:1px solid rgba(239,68,68,0.2);">
+            <div style="font-size:0.75rem; color:#fca5a5; font-weight:600; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.04em;">🚩 Detected Indicators</div>
+            <div id="liveKeywordTags" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+            <a id="liveViewFullBtn" href="/results" class="analyze-btn" style="flex:1; text-align:center; font-size:0.84rem; padding:10px 16px; text-decoration:none;">
+              📊 Full Report →
+            </a>
+            <a href="/report-scam" id="liveReportBtn" class="clear-btn" style="flex:1; text-align:center; font-size:0.84rem; padding:10px 16px; text-decoration:none;">
+              ⚠️ Report Scam
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img
+          src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}"
+          alt="Graphura"
+          class="graphura-logo"
+        >
+        <span>ScamShield</span>
+        <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
+      </div>
+      <div class="footer-links">
+        <a href="/" class="footer-link">Home</a>
+        <a href="/analyze-job" class="footer-link">Analyze Job</a>
+        <a href="/dashboard" class="footer-link">Dashboard</a>
+        <a href="/about" class="footer-link">About AI</a>
+      </div>
+      <div class="footer-note">
+        Built with NLP + Logistic Regression ML · 96% Accuracy · Protecting India's Youth
+      </div>
+    </div>
+  </div>
+</footer>
+
+<div class="scrape-toast" id="scrapeToast"></div>
+
+<!-- ── Skills Extraction Engine (runs before main.js so overrides work) ── -->
+<script>
+(function () {
+  'use strict';
+
+  const LEGIT_SKILLS = [
+    'python', 'javascript', 'typescript', 'react', 'node.js', 'sql', 'excel',
+    'communication', 'ms office', 'photoshop', 'figma', 'java', 'c++', 'c#',
+    'machine learning', 'deep learning', 'data analysis', 'power bi', 'tableau',
+    'tally', 'autocad', 'english', 'hindi', 'marketing', 'sales', 'content writing',
+    'video editing', 'graphic design', 'seo', 'social media', 'microsoft word',
+    'powerpoint', 'research', 'teamwork', 'leadership', 'problem solving',
+    'time management', 'customer service', 'canva', 'wordpress', 'flutter',
+    'android', 'ios', 'ui/ux', 'django', 'flask', 'php', 'html', 'css',
+  ];
+
+  const SUSPICIOUS_SIGNALS = [
+    'no experience required', 'no qualification needed', 'freshers only',
+    'anyone can do', 'no skills needed', 'work from home', 'part time',
+    'flexible hours', 'whatsapp', 'telegram', 'earn from home',
+    'daily payment', 'online work', 'data entry', 'form filling',
+    'copy paste', 'ad posting', 'survey filling', 'captcha solving',
+  ];
+
+  // Mutable tag state
+  let _detectedSkills = [];
+
+  function _extractFromText(text) {
+    const lower = text.toLowerCase();
+    const found = [];
+    const seen  = new Set();
+    // Suspicious first (so they get flagged even if legit list has overlap)
+    for (const sig of SUSPICIOUS_SIGNALS) {
+      if (lower.includes(sig) && !seen.has(sig)) {
+        found.push({ text: sig, type: 'suspicious' });
+        seen.add(sig);
+      }
+    }
+    // Legit skills
+    for (const skill of LEGIT_SKILLS) {
+      if (lower.includes(skill) && !seen.has(skill)) {
+        found.push({ text: skill, type: 'legit' });
+        seen.add(skill);
+      }
+    }
+    return found;
+  }
+
+  function _syncHiddenInput() {
+    const el = document.getElementById('skills');
+    if (el) el.value = _detectedSkills.map(s => s.text).join(', ');
+  }
+
+  function _renderTags() {
+    const container = document.getElementById('skillTagsContainer');
+    const group     = document.getElementById('skillsPreviewGroup');
+    const warning   = document.getElementById('suspiciousSkillsWarning');
+    const warnText  = document.getElementById('suspiciousSkillsWarningText');
+    if (!container) return;
+
+    if (_detectedSkills.length === 0) {
+      if (group)   group.style.display   = 'none';
+      if (warning) warning.style.display = 'none';
+      _syncHiddenInput();
+      return;
+    }
+
+    if (group) group.style.display = 'block';
+
+    container.innerHTML = _detectedSkills.map((skill, idx) => {
+      const isScam  = skill.type === 'suspicious';
+      const bg      = isScam ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.10)';
+      const border  = isScam ? 'rgba(239,68,68,0.35)'  : 'rgba(16,185,129,0.35)';
+      const color   = isScam ? '#fca5a5'               : '#6ee7b7';
+      const icon    = isScam ? '🔴' : '🟢';
+      return `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;
+        background:${bg};border:1px solid ${border};border-radius:100px;
+        font-size:0.78rem;color:${color};font-weight:500;transition:all 0.2s;">
+        ${icon} ${skill.text}
+        <button type="button"
+          onclick="window._ssRemoveSkill(${idx})"
+          style="background:none;border:none;color:${color};cursor:pointer;
+                 font-size:0.9rem;padding:0 2px;line-height:1;opacity:0.7;"
+          title="Remove">×</button></span>`;
+    }).join('');
+
+    _syncHiddenInput();
+
+    // Warning banner
+    const suspicious = _detectedSkills.filter(s => s.type === 'suspicious');
+    if (suspicious.length >= 2) {
+      if (warnText) warnText.textContent = suspicious.slice(0, 5).map(s => `"${s.text}"`).join(', ');
+      if (warning)  warning.style.display = 'block';
+    } else {
+      if (warning) warning.style.display = 'none';
+    }
+  }
+
+  // Exposed globally so onclick handlers work
+  window._ssRemoveSkill = function (idx) {
+    _detectedSkills.splice(idx, 1);
+    _renderTags();
+  };
+
+  window.addManualSkill = function () {
+    const input = document.getElementById('manualSkillInput');
+    if (!input || !input.value.trim()) return;
+    const text        = input.value.trim().toLowerCase();
+    const isSuspicious = SUSPICIOUS_SIGNALS.some(s => text.includes(s) || s.includes(text));
+    const alreadyExists = _detectedSkills.some(s => s.text === text);
+    if (!alreadyExists) {
+      _detectedSkills.push({ text, type: isSuspicious ? 'suspicious' : 'legit' });
+      _renderTags();
+    }
+    input.value = '';
+    input.focus();
+  };
+
+  // ── Wire up description textarea (debounced 400ms) ──
+  document.addEventListener('DOMContentLoaded', function () {
+    const descTA = document.getElementById('job_description');
+    if (descTA) {
+      let _timer = null;
+      descTA.addEventListener('input', function () {
+        clearTimeout(_timer);
+        _timer = setTimeout(function () {
+          _detectedSkills = _extractFromText(descTA.value);
+          _renderTags();
+        }, 400);
+      });
+    }
+
+    // Manual skill input — Enter key
+    const manualInput = document.getElementById('manualSkillInput');
+    if (manualInput) {
+      manualInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); window.addManualSkill(); }
+      });
+    }
+
+    // Sync hidden field on submit (capture phase — before main.js listener)
+    const form = document.getElementById('analyzeForm');
+    if (form) {
+      form.addEventListener('submit', function () {
+        _syncHiddenInput();
+      }, true);
+    }
+  });
+
+  // ── Patch loadExample so skill tags update when examples are loaded ──
+  window.addEventListener('load', function () {
+    const origLoadExample = window.loadExample;
+    if (typeof origLoadExample === 'function') {
+      window.loadExample = function (type) {
+        origLoadExample(type);
+        setTimeout(function () {
+          const descEl = document.getElementById('job_description');
+          if (descEl) {
+            _detectedSkills = _extractFromText(descEl.value);
+            _renderTags();
+          }
+        }, 60);
+      };
+    }
+  });
+
+}());
+</script>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

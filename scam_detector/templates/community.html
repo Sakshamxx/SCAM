@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Community Reports — ScamShield AI by Graphura India</title>
+  <meta name="description" content="Community-submitted scam reports. See recent job scam warnings, top reported companies, and help protect others by reporting fraud." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+{% include 'components/navbar.html' %}
+
+<div class="hero-bg-grid"></div>
+<section class="page-hero">
+  <div class="container">
+    <div class="page-hero-inner">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        Community Intelligence
+      </div>
+      <h1 class="page-hero-title">Community Scam Reports</h1>
+      <p class="page-hero-sub">Real reports from real students. Help protect the community by sharing your experience with fraudulent recruiters and fake job postings.</p>
+    </div>
+  </div>
+</section>
+
+<section class="dashboard-section">
+  <div class="container">
+
+    <!-- Stats Row -->
+    <div class="kpi-grid" style="margin-bottom:40px;">
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(239,68,68,0.15)">⚠️</div>
+        <div class="kpi-body">
+          <div class="kpi-value kpi-value-red">{{ recent_reports | length }}</div>
+          <div class="kpi-label">Recent Reports</div>
+          <div class="kpi-trend kpi-trend-neutral">Community submissions</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(99,102,241,0.15)">🏢</div>
+        <div class="kpi-body">
+          <div class="kpi-value">
+            {% set unique_companies = recent_reports | map(attribute='company') | list | unique | list %}
+            {{ unique_companies | length }}
+          </div>
+          <div class="kpi-label">Unique Companies</div>
+          <div class="kpi-trend kpi-trend-neutral">Reported in feed</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(16,185,129,0.15)">🛡️</div>
+        <div class="kpi-body">
+          <div class="kpi-value kpi-value-green">Protected</div>
+          <div class="kpi-label">Community Status</div>
+          <div class="kpi-trend kpi-trend-neutral">Active monitoring</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(245,158,11,0.15)">📝</div>
+        <div class="kpi-body">
+          <div class="kpi-value kpi-value-yellow">Open</div>
+          <div class="kpi-label">Reporting Status</div>
+          <div class="kpi-trend kpi-trend-neutral">Submit your report</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA Banner -->
+    <div style="background:linear-gradient(135deg, rgba(239,68,68,0.12), rgba(99,102,241,0.08)); border:1px solid rgba(239,68,68,0.2); border-radius:16px; padding:24px 32px; margin-bottom:40px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+      <div>
+        <h3 style="color:#fca5a5; margin-bottom:6px; font-size:1.05rem;">⚠️ Encountered a Scam Job Posting?</h3>
+        <p style="color:var(--text-sub); font-size:0.88rem; margin:0;">Report it to protect other students. Takes less than 60 seconds.</p>
+      </div>
+      <a href="/report-scam" class="hero-cta" style="white-space:nowrap; font-size:0.9rem; padding:12px 28px;">
+        + Submit Report
+      </a>
+    </div>
+
+    <!-- Recent Reports Feed -->
+    <div class="chart-card" style="margin-bottom:32px;">
+      <div class="chart-card-header">
+        <h3>📢 Recent Community Reports</h3>
+        <span class="chart-badge">Latest Alerts</span>
+      </div>
+
+      {% if recent_reports %}
+      <div style="display:flex; flex-direction:column; gap:0;">
+        {% for report in recent_reports %}
+        <div style="padding:18px 0; border-bottom:1px solid rgba(255,255,255,0.05); {% if loop.last %}border-bottom:none;{% endif %}">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:200px;">
+              <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
+                <span class="verdict-badge verdict-scam">⚠️ Reported Scam</span>
+                <span style="font-weight:700; color:#e2e8f0; font-size:0.92rem;">{{ report.company }}</span>
+              </div>
+              {% if report.website %}
+              <div style="font-family:monospace; font-size:0.78rem; color:#a5b4fc; margin-bottom:8px;">
+                🌐 {{ report.website[:60] }}{% if report.website | length > 60 %}…{% endif %}
+              </div>
+              {% endif %}
+              <p style="color:var(--text-sub); font-size:0.85rem; line-height:1.6; margin:0;">
+                {{ report.description[:200] }}{% if report.description | length > 200 %}…{% endif %}
+              </p>
+            </div>
+            <div style="text-align:right; flex-shrink:0;">
+              <div class="table-date" style="font-size:0.75rem;">
+                {{ report.created_at[:10] if report.created_at else '' }}
+              </div>
+              {% if report.website %}
+              <div style="margin-top:8px;">
+                <a href="/domain-check" style="font-size:0.75rem; color:#a5b4fc; text-decoration:none;">
+                  🔍 Analyze Domain
+                </a>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center; padding:48px 24px;">
+        <div style="font-size:3rem; margin-bottom:16px;">📭</div>
+        <h3 style="color:#e2e8f0; margin-bottom:8px;">No Reports Yet</h3>
+        <p style="color:var(--text-sub); margin-bottom:24px;">Be the first to help the community by reporting a scam job posting.</p>
+        <a href="/report-scam" class="hero-cta" style="font-size:0.9rem; padding:12px 28px;">+ Submit First Report</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Common Scam Patterns from Community -->
+    <div class="chart-card" style="margin-bottom:32px;">
+      <div class="chart-card-header">
+        <h3>🔴 Most Reported Scam Patterns</h3>
+        <span class="chart-badge">Community Intelligence</span>
+      </div>
+      <div class="indicator-bars">
+        <div class="indicator-bar-item">
+          <div class="indicator-label">Registration / Training Fee Scams</div>
+          <div class="bar-track" style="flex:1">
+            <div class="bar-fill bar-red" style="width:88%; height:100%; border-radius:4px;"></div>
+          </div>
+          <div class="indicator-count">Most Reported</div>
+        </div>
+        <div class="indicator-bar-item">
+          <div class="indicator-label">WhatsApp-Only Recruiters</div>
+          <div class="bar-track" style="flex:1">
+            <div class="bar-fill bar-red" style="width:79%; height:100%; border-radius:4px;"></div>
+          </div>
+          <div class="indicator-count">Very High</div>
+        </div>
+        <div class="indicator-bar-item">
+          <div class="indicator-label">Fake Company Websites</div>
+          <div class="bar-track" style="flex:1">
+            <div class="bar-fill bar-orange" style="width:65%; height:100%; border-radius:4px;"></div>
+          </div>
+          <div class="indicator-count">High</div>
+        </div>
+        <div class="indicator-bar-item">
+          <div class="indicator-label">Document / Aadhaar Collection</div>
+          <div class="bar-track" style="flex:1">
+            <div class="bar-fill bar-orange" style="width:54%; height:100%; border-radius:4px;"></div>
+          </div>
+          <div class="indicator-count">High</div>
+        </div>
+        <div class="indicator-bar-item">
+          <div class="indicator-label">Telegram Task Scams</div>
+          <div class="bar-track" style="flex:1">
+            <div class="bar-fill bar-yellow" style="width:43%; height:100%; border-radius:4px;"></div>
+          </div>
+          <div class="indicator-count">Medium</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Community Warning Banner -->
+    <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:16px; padding:24px; margin-bottom:40px;">
+      <h4 style="color:#fcd34d; margin-bottom:12px;">⚡ Community Scam Alert</h4>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px;">
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <span style="color:#f59e0b; flex-shrink:0; font-size:1.1rem;">🚨</span>
+          <div>
+            <div style="font-weight:600; color:#e2e8f0; font-size:0.85rem; margin-bottom:4px;">Surge in "Part-Time" Scams</div>
+            <div style="color:var(--text-sub); font-size:0.8rem;">Multiple reports of "₹500 per task" WhatsApp offers that turn into investment fraud.</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <span style="color:#f59e0b; flex-shrink:0; font-size:1.1rem;">🚨</span>
+          <div>
+            <div style="font-weight:600; color:#e2e8f0; font-size:0.85rem; margin-bottom:4px;">Fake Internshala Listings</div>
+            <div style="color:var(--text-sub); font-size:0.8rem;">Scammers copy legitimate listings and redirect to external payment links.</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <span style="color:#f59e0b; flex-shrink:0; font-size:1.1rem;">🚨</span>
+          <div>
+            <div style="font-weight:600; color:#e2e8f0; font-size:0.85rem; margin-bottom:4px;">AI-Generated Offer Letters</div>
+            <div style="color:var(--text-sub); font-size:0.8rem;">Fraudulent offer letters with AI-generated logos and signatures circulating on WhatsApp.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}" alt="Graphura" class="graphura-logo">
+        <span>ScamShield</span>
+        <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
+      </div>
+      <div class="footer-links">
+        <a href="/" class="footer-link">Home</a>
+        <a href="/report-scam" class="footer-link">Report Scam</a>
+        <a href="/awareness" class="footer-link">Awareness Hub</a>
+        <a href="/threat-intel" class="footer-link">Threat Intel</a>
+      </div>
+      <div class="footer-note">ScamShield AI · Community Reports · Protecting India's Students</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Domain Risk Analyzer — ScamShield AI by Graphura India</title>
+  <meta name="description" content="Analyze any domain or website for scam risk. Check SSL status, suspicious patterns, brand impersonation, and URL shorteners instantly." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+{% include 'components/navbar.html' %}
+
+<div class="hero-bg-grid"></div>
+<section class="page-hero">
+  <div class="container">
+    <div class="page-hero-inner">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        Threat Intelligence
+      </div>
+      <h1 class="page-hero-title">Domain Risk Analyzer</h1>
+      <p class="page-hero-sub">Professional-grade domain intelligence. Check any URL for SSL status, suspicious patterns, brand impersonation, and blacklist status.</p>
+    </div>
+  </div>
+</section>
+
+<section class="dashboard-section">
+  <div class="container">
+
+    <!-- Domain Input -->
+    <div class="chart-card" style="max-width:720px; margin:0 auto 40px;">
+      <div class="chart-card-header">
+        <h3>🌐 Domain Analysis</h3>
+        <span class="chart-badge">Real-time Intelligence</span>
+      </div>
+      <div style="padding:8px 0;">
+        <div class="form-group">
+          <label class="form-label" for="domainInput">Enter Domain or URL to Analyze</label>
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <input type="text" id="domainInput" class="form-input"
+              placeholder="https://suspicious-site.com or just suspicious-site.com"
+              value="{{ checked_url or '' }}"
+              style="flex:1; min-width:200px; font-family:monospace;" />
+            <button onclick="analyzeDomain()" id="analyzeBtn" class="hero-cta" style="padding:13px 28px; font-size:0.95rem;">
+              🔍 Analyze
+            </button>
+          </div>
+        </div>
+        <div id="analyzeStatus" style="display:none; margin-top:12px;">
+          <div class="skeleton-line" style="width:60%; height:16px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result Panel (server-rendered on POST) -->
+    {% if result %}
+    <div class="chart-card" style="max-width:720px; margin:0 auto 40px;" id="domainResult">
+      <div class="chart-card-header">
+        <h3>📡 Domain Intelligence Report</h3>
+        {% if result.risk_level == 'LOW' %}
+        <span class="chart-badge" style="background:rgba(16,185,129,0.2); color:#6ee7b7; border-radius:8px; padding:4px 12px;">
+        {% elif result.risk_level == 'MEDIUM' %}
+        <span class="chart-badge" style="background:rgba(245,158,11,0.2); color:#fcd34d; border-radius:8px; padding:4px 12px;">
+        {% elif result.risk_level == 'HIGH' %}
+        <span class="chart-badge" style="background:rgba(239,68,68,0.2); color:#fca5a5; border-radius:8px; padding:4px 12px;">
+        {% else %}
+        <span class="chart-badge" style="background:rgba(127,29,29,0.3); color:#fca5a5; border-radius:8px; padding:4px 12px;">
+        {% endif %}
+          {{ result.status }}
+        </span>
+      </div>
+      <div style="padding:8px 0;">
+        <div style="font-family:monospace; font-size:0.85rem; color:#a5b4fc; background:rgba(99,102,241,0.08); padding:12px 16px; border-radius:10px; margin-bottom:20px; word-break:break-all;">
+          {{ result.url }}
+        </div>
+
+        <!-- Score Grid -->
+        <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:24px;">
+          <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+            {% if result.trust_score >= 65 %}
+            <div style="font-size:2rem; font-weight:800; color:#6ee7b7;">
+            {% elif result.trust_score >= 40 %}
+            <div style="font-size:2rem; font-weight:800; color:#fcd34d;">
+            {% else %}
+            <div style="font-size:2rem; font-weight:800; color:#fca5a5;">
+            {% endif %}
+              {{ result.risk_score }}/100
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-sub); margin-top:4px;">Risk Score</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+            {% if result.risk_level == 'LOW' %}
+            <div style="font-size:1.4rem; font-weight:700; color:#6ee7b7;">
+            {% elif result.risk_level == 'MEDIUM' %}
+            <div style="font-size:1.4rem; font-weight:700; color:#fcd34d;">
+            {% elif result.risk_level == 'HIGH' %}
+            <div style="font-size:1.4rem; font-weight:700; color:#fca5a5;">
+            {% else %}
+            <div style="font-size:1.4rem; font-weight:700; color:#f87171;">
+            {% endif %}
+              {{ result.trust_level }}
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-sub); margin-top:4px;">Trust Level</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+            <div style="font-size:1.1rem; font-weight:700; color:#e2e8f0;">{{ result.ssl_status }}</div>
+            <div style="font-size:0.75rem; color:var(--text-sub); margin-top:4px;">SSL Status</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+            <div style="font-size:1.1rem; font-weight:700; color:#e2e8f0;">{{ result.domain_age }}</div>
+            <div style="font-size:0.75rem; color:var(--text-sub); margin-top:4px;">Domain Age</div>
+          </div>
+        </div>
+
+        <!-- AI Explanation -->
+        <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.25); border-radius:12px; padding:16px 20px; margin-bottom:20px;">
+          <div style="font-size:0.78rem; color:#a5b4fc; font-weight:600; margin-bottom:8px;">🤖 AI Explanation</div>
+          <p style="color:#e2e8f0; font-size:0.88rem; line-height:1.7; margin:0;">{{ result.ai_explanation }}</p>
+        </div>
+
+        <!-- Analysis Detail -->
+        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:16px 20px; margin-bottom:20px;">
+          <div style="font-size:0.78rem; color:var(--text-sub); font-weight:600; margin-bottom:8px;">🔍 Analysis Details</div>
+          <p style="color:#e2e8f0; font-size:0.88rem; line-height:1.7; margin:0;">{{ result.reason }}</p>
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <a href="/verify-company?url={{ checked_url | urlencode }}" class="hero-cta" style="font-size:0.85rem; padding:10px 20px;">
+            🔍 Full Company Check
+          </a>
+          <a href="/report-scam" style="background:rgba(239,68,68,0.1); color:#fca5a5; border:1px solid rgba(239,68,68,0.3); padding:10px 20px; border-radius:100px; font-size:0.85rem; text-decoration:none;">
+            ⚠️ Report Domain
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Domain result from JS -->
+    <div id="jsDomainResult" style="max-width:720px; margin:0 auto 40px; display:none;" class="chart-card">
+      <div class="chart-card-header">
+        <h3>📡 Domain Intelligence Report</h3>
+        <span id="jsStatusBadge" class="chart-badge"></span>
+      </div>
+      <div style="padding:8px 0;" id="jsDomainResultBody"></div>
+    </div>
+
+    <!-- Signal Glossary -->
+    <div class="chart-card" style="max-width:720px; margin:0 auto;">
+      <div class="chart-card-header">
+        <h3>📚 Risk Signal Glossary</h3>
+        <span class="chart-badge">What we check</span>
+      </div>
+      <div style="display:grid; gap:14px; padding:8px 0;">
+        <div style="display:flex; gap:14px; align-items:flex-start; padding:12px; background:rgba(255,255,255,0.03); border-radius:10px;">
+          <span style="font-size:1.4rem;">🔒</span>
+          <div><strong style="color:#e2e8f0; font-size:0.9rem;">SSL / HTTPS Status</strong><br><span style="color:var(--text-sub); font-size:0.82rem;">Sites without HTTPS encryption are risky — legitimate companies always use HTTPS.</span></div>
+        </div>
+        <div style="display:flex; gap:14px; align-items:flex-start; padding:12px; background:rgba(255,255,255,0.03); border-radius:10px;">
+          <span style="font-size:1.4rem;">🏷️</span>
+          <div><strong style="color:#e2e8f0; font-size:0.9rem;">Brand Impersonation</strong><br><span style="color:var(--text-sub); font-size:0.82rem;">Domains like "google-jobs.in" or "tcs-hiring.blogspot.com" impersonate trusted brands.</span></div>
+        </div>
+        <div style="display:flex; gap:14px; align-items:flex-start; padding:12px; background:rgba(255,255,255,0.03); border-radius:10px;">
+          <span style="font-size:1.4rem;">🔗</span>
+          <div><strong style="color:#e2e8f0; font-size:0.9rem;">URL Shorteners</strong><br><span style="color:var(--text-sub); font-size:0.82rem;">bit.ly, tinyurl etc. hide the real destination and are commonly used in phishing attacks.</span></div>
+        </div>
+        <div style="display:flex; gap:14px; align-items:flex-start; padding:12px; background:rgba(255,255,255,0.03); border-radius:10px;">
+          <span style="font-size:1.4rem;">⛔</span>
+          <div><strong style="color:#e2e8f0; font-size:0.9rem;">Blacklist Database</strong><br><span style="color:var(--text-sub); font-size:0.82rem;">Cross-referenced against our continuously updated database of known scam domains.</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}" alt="Graphura" class="graphura-logo">
+        <span>ScamShield</span>
+        <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
+      </div>
+      <div class="footer-links">
+        <a href="/" class="footer-link">Home</a>
+        <a href="/domain-check" class="footer-link">Domain Check</a>
+        <a href="/verify-company" class="footer-link">Verify Company</a>
+        <a href="/threat-intel" class="footer-link">Threat Intel</a>
+      </div>
+      <div class="footer-note">ScamShield AI · Domain Intelligence · Graphura India</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+async function analyzeDomain() {
+  const input = document.getElementById('domainInput');
+  const btn = document.getElementById('analyzeBtn');
+  const status = document.getElementById('analyzeStatus');
+  const resultPanel = document.getElementById('jsDomainResult');
+  const resultBody = document.getElementById('jsDomainResultBody');
+  const statusBadge = document.getElementById('jsStatusBadge');
+
+  const url = input.value.trim();
+  if (!url) { input.focus(); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Analyzing...';
+  status.style.display = 'block';
+  resultPanel.style.display = 'none';
+
+  try {
+    const resp = await fetch('/domain-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await resp.json();
+
+    const colorMap = { LOW: '#6ee7b7', MEDIUM: '#fcd34d', HIGH: '#fca5a5', CRITICAL: '#f87171', UNKNOWN: '#94a3b8' };
+    const bgMap   = { LOW: 'rgba(16,185,129,0.2)', MEDIUM: 'rgba(245,158,11,0.2)', HIGH: 'rgba(239,68,68,0.2)', CRITICAL: 'rgba(127,29,29,0.3)', UNKNOWN: 'rgba(148,163,184,0.2)' };
+    const barMap  = { LOW: 'bar-green', MEDIUM: 'bar-yellow', HIGH: 'bar-red', CRITICAL: 'bar-red', UNKNOWN: 'bar-yellow' };
+
+    const rl = data.risk_level || 'UNKNOWN';
+    statusBadge.textContent = data.status || rl;
+    statusBadge.style.cssText = `background:${bgMap[rl]}; color:${colorMap[rl]}; border-radius:8px; padding:4px 12px;`;
+
+    resultBody.innerHTML = `
+      <div style="font-family:monospace; font-size:0.85rem; color:#a5b4fc; background:rgba(99,102,241,0.08); padding:12px 16px; border-radius:10px; margin-bottom:20px; word-break:break-all;">${data.url || url}</div>
+      <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-bottom:24px;">
+        <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+          <div style="font-size:2rem; font-weight:800; color:${colorMap[rl]}">${data.risk_score}/100</div>
+          <div style="font-size:0.75rem; color:var(--text-sub); margin-top:4px;">Risk Score</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+          <div style="font-size:1.4rem; font-weight:700; color:${colorMap[rl]}">${data.trust_level}</div>
+          <div style="font-size:0.75rem; color:var(--text-sub); margin-top:4px;">Trust Level</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+          <div style="font-size:1.1rem; font-weight:700; color:#e2e8f0;">${data.ssl_status}</div>
+          <div style="font-size:0.75rem; color:var(--text-sub); margin-top:4px;">SSL Status</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+          <div style="font-size:1.1rem; font-weight:700; color:#e2e8f0;">${data.domain_age}</div>
+          <div style="font-size:0.75rem; color:var(--text-sub); margin-top:4px;">Domain Age</div>
+        </div>
+      </div>
+      
+      <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.25); border-radius:12px; padding:16px 20px; margin-bottom:20px;">
+        <div style="font-size:0.78rem; color:#a5b4fc; font-weight:600; margin-bottom:8px;">🤖 AI Explanation</div>
+        <p style="color:#e2e8f0; font-size:0.88rem; line-height:1.7; margin:0;">${data.ai_explanation}</p>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:16px 20px;">
+        <div style="font-size:0.78rem; color:var(--text-sub); font-weight:600; margin-bottom:8px;">🔍 Analysis Details</div>
+        <p style="color:#e2e8f0; font-size:0.88rem; line-height:1.7; margin:0;">${data.reason}</p>
+      </div>
+    `;
+    resultPanel.style.display = 'block';
+    resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch(e) {
+    alert('Analysis failed. Please check the URL and try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔍 Analyze';
+    status.style.display = 'none';
+  }
+}
+
+document.getElementById('domainInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') analyzeDomain();
+});
+</script>
+
+</body>
+</html>

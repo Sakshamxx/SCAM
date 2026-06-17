@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About the AI — ScamShield by Graphura India</title>
+  <meta name="description" content="Learn how ScamShield uses NLP and Machine Learning to detect fake job and internship scams. Technology stack, methodology, accuracy metrics and team." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+{% include 'components/navbar.html' %}
+
+<!-- ── PAGE HERO ── -->
+<div class="hero-bg-grid"></div>
+<section class="page-hero">
+  <div class="container">
+    <div class="page-hero-inner">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        Built by Team-J · Graphura India
+      </div>
+      <h1 class="page-hero-title">How ScamShield Works</h1>
+      <p class="page-hero-sub">The AI pipeline, models, methodology, and technology stack behind the 96% detection accuracy</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── PROJECT OVERVIEW ── -->
+<section class="about-section">
+  <div class="container">
+    <div class="about-overview-grid">
+      <div class="about-overview-text">
+        <div class="about-section-eyebrow">Project Overview</div>
+        <h2 class="about-section-title">Protecting India's Job Seekers with AI</h2>
+        <p class="about-body-text">
+          ScamShield is an AI-powered fake job and internship detection system built by <strong>Team-J</strong> at
+          <strong>Graphura India Private Limited</strong>. With millions of young Indians actively searching for employment,
+          fraudulent job postings have become a critical threat — stealing money, personal data, and time from vulnerable job seekers.
+        </p>
+        <p class="about-body-text">
+          Our system combines Natural Language Processing (NLP) with structured Machine Learning to analyze job postings across
+          4 dimensions simultaneously: <strong>keyword patterns, domain trust, salary anomalies, and language model scoring</strong>.
+          The result is a real-time risk score with explainable indicators.
+        </p>
+        <div class="about-stats-row">
+          <div class="about-stat">
+            <div class="about-stat-num">96%</div>
+            <div class="about-stat-label">Detection Accuracy</div>
+          </div>
+          <div class="about-stat">
+            <div class="about-stat-num">40+</div>
+            <div class="about-stat-label">Fraud Signal Keywords</div>
+          </div>
+          <div class="about-stat">
+            <div class="about-stat-num">5,500+</div>
+            <div class="about-stat-label">Training Samples</div>
+          </div>
+          <div class="about-stat">
+            <div class="about-stat-num">4</div>
+            <div class="about-stat-label">Detection Layers</div>
+          </div>
+        </div>
+      </div>
+      <div class="about-overview-visual">
+        <div class="pipeline-diagram">
+          <div class="pipeline-node pipeline-node-input">
+            <span class="pipeline-icon">📄</span>
+            <div class="pipeline-label">Job Posting Input</div>
+            <div class="pipeline-sublabel">Title · Description · URL · Salary</div>
+          </div>
+          <div class="pipeline-arrow">↓</div>
+          <div class="pipeline-node pipeline-node-process">
+            <span class="pipeline-icon">⚙️</span>
+            <div class="pipeline-label">4-Layer AI Engine</div>
+            <div class="pipeline-sublabel">NLP · Keywords · Domain · Salary</div>
+          </div>
+          <div class="pipeline-arrow">↓</div>
+          <div class="pipeline-node pipeline-node-output">
+            <span class="pipeline-icon">🎯</span>
+            <div class="pipeline-label">Risk Score (0–100)</div>
+            <div class="pipeline-sublabel">With indicators & recommendations</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── NLP PIPELINE ── -->
+<section class="about-section about-section-alt">
+  <div class="container">
+    <div class="about-section-eyebrow" style="text-align:center">Natural Language Processing</div>
+    <h2 class="about-section-title" style="text-align:center">NLP Pipeline</h2>
+    <p class="section-sub">How raw job text is transformed into fraud probability</p>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-icon" style="background:rgba(99,102,241,0.15)">🧹</div>
+        <div class="step-num">01</div>
+        <h3>Text Preprocessing</h3>
+        <p>Lowercasing, stop-word removal, punctuation stripping, and Unicode normalization on the raw job description text</p>
+      </div>
+      <div class="step-card">
+        <div class="step-icon" style="background:rgba(245,158,11,0.15)">📐</div>
+        <div class="step-num">02</div>
+        <h3>TF-IDF Vectorization</h3>
+        <p>Term Frequency-Inverse Document Frequency converts text to a numerical feature matrix. Captures word importance relative to the training corpus</p>
+      </div>
+      <div class="step-card">
+        <div class="step-icon" style="background:rgba(16,185,129,0.15)">🤖</div>
+        <div class="step-num">03</div>
+        <h3>Logistic Regression</h3>
+        <p>Trained on 5,500+ labeled job postings (scam / genuine). Outputs a fraud probability score (0–1) for any new posting</p>
+      </div>
+      <div class="step-card">
+        <div class="step-icon" style="background:rgba(239,68,68,0.15)">🔀</div>
+        <div class="step-num">04</div>
+        <h3>Weighted Fusion</h3>
+        <p>NLP score is combined with keyword, domain, and salary scores using calibrated weights to produce the final risk score</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── ML MODELS ── -->
+<section class="about-section">
+  <div class="container">
+    <div class="about-section-eyebrow" style="text-align:center">Machine Learning</div>
+    <h2 class="about-section-title" style="text-align:center">Trained Models</h2>
+    <p class="section-sub">Two complementary ML models working together</p>
+    <div class="scam-grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+      <div class="scam-card" style="text-align:left; padding:28px;">
+        <span class="scam-emoji">📝</span>
+        <h3>NLP Pipeline Model</h3>
+        <p style="margin-bottom:16px;">TF-IDF + Logistic Regression trained on job description text. Weight: 10% of final score.</p>
+        <div class="model-specs">
+          <div class="model-spec-item"><span class="spec-key">Algorithm</span><span class="spec-val">Logistic Regression</span></div>
+          <div class="model-spec-item"><span class="spec-key">Features</span><span class="spec-val">Text (TF-IDF)</span></div>
+          <div class="model-spec-item"><span class="spec-key">File</span><span class="spec-val">nlp_pipeline.pkl</span></div>
+          <div class="model-spec-item"><span class="spec-key">Output</span><span class="spec-val">Fraud probability (0–1)</span></div>
+        </div>
+      </div>
+      <div class="scam-card" style="text-align:left; padding:28px;">
+        <span class="scam-emoji">🔢</span>
+        <h3>Structured ML Model</h3>
+        <p style="margin-bottom:16px;">Trained on structured features — salary, experience, location, job title. Provides supplementary classification.</p>
+        <div class="model-specs">
+          <div class="model-spec-item"><span class="spec-key">Algorithm</span><span class="spec-val">Logistic Regression</span></div>
+          <div class="model-spec-item"><span class="spec-key">Features</span><span class="spec-val">Salary, Exp, Location, Title</span></div>
+          <div class="model-spec-item"><span class="spec-key">File</span><span class="spec-val">logistic_model.pkl</span></div>
+          <div class="model-spec-item"><span class="spec-key">Output</span><span class="spec-val">Scam probability (0–1)</span></div>
+        </div>
+      </div>
+      <div class="scam-card" style="text-align:left; padding:28px;">
+        <span class="scam-emoji">⚖️</span>
+        <h3>Feature Scaler</h3>
+        <p style="margin-bottom:16px;">StandardScaler normalizes structured numeric features before feeding into the ML model for stable predictions.</p>
+        <div class="model-specs">
+          <div class="model-spec-item"><span class="spec-key">Type</span><span class="spec-val">StandardScaler</span></div>
+          <div class="model-spec-item"><span class="spec-key">Applied to</span><span class="spec-val">Salary, Experience</span></div>
+          <div class="model-spec-item"><span class="spec-key">File</span><span class="spec-val">scaler.pkl</span></div>
+        </div>
+      </div>
+      <div class="scam-card" style="text-align:left; padding:28px;">
+        <span class="scam-emoji">🗺️</span>
+        <h3>Label Encoders</h3>
+        <p style="margin-bottom:16px;">Label encoders for location and job title convert categorical text into numeric IDs for the structured model.</p>
+        <div class="model-specs">
+          <div class="model-spec-item"><span class="spec-key">Type</span><span class="spec-val">LabelEncoder</span></div>
+          <div class="model-spec-item"><span class="spec-key">Files</span><span class="spec-val">le_location.pkl, le_title.pkl</span></div>
+          <div class="model-spec-item"><span class="spec-key">Handles</span><span class="spec-val">Unseen labels safely</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── DETECTION METHODOLOGY ── -->
+<section class="about-section about-section-alt">
+  <div class="container">
+    <div class="about-section-eyebrow" style="text-align:center">Methodology</div>
+    <h2 class="about-section-title" style="text-align:center">Scam Detection Formula</h2>
+    <p class="section-sub">4 signals combined with calibrated weights into one final risk score</p>
+    <div class="formula-card">
+      <div class="formula-equation">
+        <span class="formula-term">Risk Score</span>
+        <span class="formula-eq"> = </span>
+        <span class="formula-block" style="border-color: var(--red)">
+          <span class="formula-weight" style="color:var(--red)">40%</span>
+          <span class="formula-name">🔑 Keywords</span>
+        </span>
+        <span class="formula-plus">+</span>
+        <span class="formula-block" style="border-color: var(--yellow)">
+          <span class="formula-weight" style="color:var(--yellow)">30%</span>
+          <span class="formula-name">🌐 Domain</span>
+        </span>
+        <span class="formula-plus">+</span>
+        <span class="formula-block" style="border-color: #f97316">
+          <span class="formula-weight" style="color:#f97316">20%</span>
+          <span class="formula-name">💰 Salary</span>
+        </span>
+        <span class="formula-plus">+</span>
+        <span class="formula-block" style="border-color: var(--primary)">
+          <span class="formula-weight" style="color:var(--primary)">10%</span>
+          <span class="formula-name">🤖 NLP</span>
+        </span>
+      </div>
+      <div class="risk-scale">
+        <div class="risk-scale-item" style="background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.3)">
+          <div class="risk-scale-range" style="color:#6ee7b7">0 – 30</div>
+          <div class="risk-scale-label">🟢 Likely Genuine</div>
+        </div>
+        <div class="risk-scale-item" style="background:rgba(245,158,11,0.12); border-color:rgba(245,158,11,0.3)">
+          <div class="risk-scale-range" style="color:#fcd34d">31 – 60</div>
+          <div class="risk-scale-label">🟡 Suspicious</div>
+        </div>
+        <div class="risk-scale-item" style="background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.3)">
+          <div class="risk-scale-range" style="color:#fca5a5">61 – 80</div>
+          <div class="risk-scale-label">🔴 Probable Scam</div>
+        </div>
+        <div class="risk-scale-item" style="background:rgba(124,58,237,0.12); border-color:rgba(124,58,237,0.3)">
+          <div class="risk-scale-range" style="color:#c4b5fd">81 – 100</div>
+          <div class="risk-scale-label">🚨 Almost Certainly a Scam</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TECH STACK ── -->
+<section class="about-section">
+  <div class="container">
+    <div class="about-section-eyebrow" style="text-align:center">Technology Stack</div>
+    <h2 class="about-section-title" style="text-align:center">Built With</h2>
+    <p class="section-sub">Modern, proven technologies for production-grade AI</p>
+    <div class="tech-stack-grid">
+      <div class="tech-category">
+        <div class="tech-category-title">🐍 Backend</div>
+        <div class="tech-badges">
+          <span class="tech-badge">Python 3.11</span>
+          <span class="tech-badge">Flask</span>
+          <span class="tech-badge">scikit-learn</span>
+          <span class="tech-badge">joblib</span>
+          <span class="tech-badge">NumPy</span>
+          <span class="tech-badge">BeautifulSoup4</span>
+          <span class="tech-badge">Requests</span>
+        </div>
+      </div>
+      <div class="tech-category">
+        <div class="tech-category-title">🤖 AI / ML</div>
+        <div class="tech-badges">
+          <span class="tech-badge tech-badge-primary">TF-IDF Vectorizer</span>
+          <span class="tech-badge tech-badge-primary">Logistic Regression</span>
+          <span class="tech-badge tech-badge-primary">StandardScaler</span>
+          <span class="tech-badge tech-badge-primary">LabelEncoder</span>
+          <span class="tech-badge tech-badge-primary">Keyword Scoring</span>
+        </div>
+      </div>
+      <div class="tech-category">
+        <div class="tech-category-title">🎨 Frontend</div>
+        <div class="tech-badges">
+          <span class="tech-badge tech-badge-green">HTML5</span>
+          <span class="tech-badge tech-badge-green">Vanilla CSS</span>
+          <span class="tech-badge tech-badge-green">Vanilla JavaScript</span>
+          <span class="tech-badge tech-badge-green">Google Fonts (Inter)</span>
+          <span class="tech-badge tech-badge-green">SVG Charts</span>
+        </div>
+      </div>
+      <div class="tech-category">
+        <div class="tech-category-title">📦 Data & Tools</div>
+        <div class="tech-badges">
+          <span class="tech-badge tech-badge-yellow">Jupyter Notebook</span>
+          <span class="tech-badge tech-badge-yellow">Pandas</span>
+          <span class="tech-badge tech-badge-yellow">Matplotlib</span>
+          <span class="tech-badge tech-badge-yellow">Git / GitHub</span>
+          <span class="tech-badge tech-badge-yellow">Supabase</span>
+          <span class="tech-badge tech-badge-yellow">Render</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── ACCURACY METRICS ── -->
+<section class="about-section about-section-alt">
+  <div class="container">
+    <div class="about-section-eyebrow" style="text-align:center">Performance</div>
+    <h2 class="about-section-title" style="text-align:center">Accuracy Metrics</h2>
+    <p class="section-sub">Model performance on held-out test data</p>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-value" style="color:#6ee7b7">96%</div>
+        <div class="metric-label">Overall Accuracy</div>
+        <div class="metric-sub">Correct classifications on test set</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" style="color:#a5b4fc">94%</div>
+        <div class="metric-label">Precision</div>
+        <div class="metric-sub">Of flagged scams, 94% are actual scams</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" style="color:#fcd34d">91%</div>
+        <div class="metric-label">Recall</div>
+        <div class="metric-sub">91% of real scams are successfully caught</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" style="color:#fca5a5">92%</div>
+        <div class="metric-label">F1 Score</div>
+        <div class="metric-sub">Harmonic mean of Precision and Recall</div>
+      </div>
+    </div>
+    <div class="metrics-note">
+    Metrics computed on a stratified 20% hold-out test split of 5,500+ labeled Indian job postings.
+    Dataset collected from Internshala, Naukri, LinkedIn, and synthetic scam samples.
+    </div>
+  </div>
+</section>
+
+<!-- ── TEAM ── -->
+<section class="about-section">
+  <div class="container">
+    <div class="about-section-eyebrow" style="text-align:center">Credits</div>
+    <h2 class="about-section-title" style="text-align:center">Team-J · Graphura India</h2>
+    <p class="section-sub">This project was built as part of a real-world AI internship program at Graphura India Private Limited</p>
+    <div class="team-card">
+      <div class="team-card-inner">
+        <div style="font-size:3rem; margin-bottom:12px;">🏢</div>
+        <h3 style="color:#fff; margin-bottom:8px;">Graphura India Private Limited</h3>
+        <p style="color:var(--text-sub); max-width:500px; margin:0 auto 20px; line-height:1.7;">
+          A technology company empowering India's youth with AI-driven tools. ScamShield is built to protect the next generation of job seekers from fraud.
+        </p>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
+          <span class="tech-badge tech-badge-primary">🎓 Student Project</span>
+          <span class="tech-badge tech-badge-green">🤖 AI / ML</span>
+          <span class="tech-badge tech-badge-yellow">🇮🇳 Made in India</span>
+          <span class="tech-badge">🛡️ Social Impact</span>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center; margin-top:40px;">
+      <a href="/analyze-job" class="hero-cta">Try ScamShield Now →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img
+          src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}"
+          alt="Graphura"
+          class="graphura-logo"
+        >
+        <span>ScamShield</span>
+        <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
+      </div>
+      <div class="footer-links">
+        <a href="/" class="footer-link">Home</a>
+        <a href="/analyze-job" class="footer-link">Analyze Job</a>
+        <a href="/dashboard" class="footer-link">Dashboard</a>
+        <a href="/about" class="footer-link">About AI</a>
+      </div>
+      <div class="footer-note">
+        Built with NLP + Logistic Regression ML · 96% Accuracy · Protecting India's Youth
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

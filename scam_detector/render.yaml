@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: scamshield
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --workers 2 --timeout 120 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SUPABASE_URL
+        fromSecret: SUPABASE_URL
+      - key: SUPABASE_KEY
+        fromSecret: SUPABASE_KEY
+      - key: GROQ_API_KEY
+        fromSecret: GROQ_API_KEY
+      - key: SECRET_KEY
+        fromSecret: SECRET_KEY

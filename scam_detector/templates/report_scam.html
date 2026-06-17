@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Report a Scam — ScamShield by Graphura India</title>
+  <meta name="description" content="Report a fake job or internship scam to ScamShield. Help protect other job seekers by submitting fraudulent company details." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    .report-wrapper {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 32px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .report-wrapper { grid-template-columns: 1fr; }
+    }
+
+    .report-form-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px;
+    }
+    .report-form-panel h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+    .report-form-panel > p {
+      color: var(--text-sub);
+      font-size: 0.9rem;
+      margin-bottom: 28px;
+    }
+
+    .auth-success {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(16,185,129,0.1);
+      border: 1px solid rgba(16,185,129,0.3);
+      border-radius: 12px;
+      padding: 14px 18px;
+      color: #6ee7b7;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+    .report-info-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .report-info-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .report-info-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 10px;
+    }
+    .report-info-card p {
+      color: var(--text-sub);
+      font-size: 0.85rem;
+      line-height: 1.7;
+    }
+
+    .report-stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .report-stat {
+      background: rgba(99,102,241,0.08);
+      border: 1px solid rgba(99,102,241,0.2);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .report-stat-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #a5b4fc;
+    }
+    .report-stat-label {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      margin-top: 4px;
+    }
+
+    .tips-list-report {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .tips-list-report li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      line-height: 1.5;
+    }
+    .tips-list-report li::before {
+      content: '⚠️';
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    textarea.report-desc {
+      min-height: 130px;
+      resize: vertical;
+    }
+
+    .char-hint {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      margin-top: 4px;
+    }
+
+    /* Success full-page state */
+    .report-success-full {
+      text-align: center;
+      padding: 60px 0;
+    }
+    .report-success-full .success-icon {
+      font-size: 4rem;
+      margin-bottom: 16px;
+    }
+    .report-success-full h2 {
+      color: #6ee7b7;
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+    }
+    .report-success-full p {
+      color: var(--text-sub);
+      font-size: 0.95rem;
+      max-width: 440px;
+      margin: 0 auto 28px;
+      line-height: 1.7;
+    }
+    .report-action-row {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+{% include 'components/navbar.html' %}
+
+<!-- ── PAGE HERO ── -->
+<div class="hero-bg-grid"></div>
+<section class="page-hero">
+  <div class="container">
+    <div class="page-hero-inner">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        Community Protection
+      </div>
+      <h1 class="page-hero-title">Report a Scam</h1>
+      <p class="page-hero-sub">Help protect other job seekers by submitting fraudulent company or job posting details.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── MAIN CONTENT ── -->
+<section class="analyzer-section" id="report">
+  <div class="container">
+
+    {% if success %}
+    <!-- ── SUCCESS STATE ── -->
+    <div class="report-success-full">
+      <div class="success-icon">✅</div>
+      <h2>Report Submitted Successfully!</h2>
+      <p>Thank you for helping protect India's job seekers. Our team will review your report and take action if the domain is confirmed malicious.</p>
+      <div class="report-action-row">
+        <a href="/report-scam" class="result-action-btn result-action-secondary">Submit Another Report</a>
+        <a href="/analyze-job" class="result-action-btn result-action-primary">Analyze a Job →</a>
+      </div>
+    </div>
+
+    {% else %}
+    <!-- ── FORM STATE ── -->
+    <div class="report-wrapper">
+
+      <!-- LEFT — FORM -->
+      <div class="report-form-panel">
+        <h2>⚠️ Submit a Scam Report</h2>
+        <p>All reports are reviewed by our team. Please provide as much detail as possible so we can verify and blacklist the domain.</p>
+
+        {% if error %}
+          <div class="auth-error" style="margin-bottom: 20px;">{{ error }}</div>
+        {% endif %}
+
+        <form id="reportForm" method="POST" autocomplete="off">
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label for="company">Company Name <span class="required">*</span></label>
+              <input
+                type="text"
+                id="company"
+                name="company"
+                placeholder="e.g. FakeJobs Pvt Ltd"
+                value="{{ prefill_company or '' }}"
+                required
+              >
+            </div>
+            <div class="form-group">
+              <label for="website">Company Website</label>
+              <input
+                type="text"
+                id="website"
+                name="website"
+                placeholder="e.g. fakejobs-earn.com"
+              >
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="description">Scam Description <span class="required">*</span></label>
+            <textarea
+              id="description"
+              name="description"
+              class="report-desc"
+              placeholder="Describe what happened — e.g. they asked for a ₹2000 registration fee, claimed to be from Amazon, sent messages only on WhatsApp..."
+              required
+              minlength="20"
+            ></textarea>
+            <div class="char-hint">Minimum 20 characters. The more detail, the better.</div>
+          </div>
+
+          <div class="analyze-btn-row" style="margin-top: 24px;">
+            <button type="submit" class="analyze-btn" id="reportBtn">
+              <span class="btn-icon">📨</span>
+              <span class="btn-text">Submit Report</span>
+            </button>
+            <button type="button" class="clear-btn" onclick="document.getElementById('reportForm').reset()">
+              ✕ Clear
+            </button>
+          </div>
+
+          <p style="color:var(--text-sub); font-size:0.78rem; margin-top:14px;">
+            🔒 Reporting as: <strong style="color:#a5b4fc">{{ session.get('user') }}</strong> · Reports are reviewed before action is taken.
+          </p>
+        </form>
+      </div>
+
+      <!-- RIGHT — INFO PANEL -->
+      <div class="report-info-panel">
+
+        <div class="report-info-card">
+          <h3>📊 Community Impact</h3>
+          <div class="report-stat-grid">
+            <div class="report-stat">
+              <div class="report-stat-value">47K+</div>
+              <div class="report-stat-label">Scams Blocked</div>
+            </div>
+            <div class="report-stat">
+              <div class="report-stat-value">12K+</div>
+              <div class="report-stat-label">Reports Received</div>
+            </div>
+            <div class="report-stat">
+              <div class="report-stat-value">96%</div>
+              <div class="report-stat-label">Accuracy Rate</div>
+            </div>
+            <div class="report-stat">
+              <div class="report-stat-value">24h</div>
+              <div class="report-stat-label">Review Time</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="report-info-card">
+          <h3>🚩 Common Scam Patterns</h3>
+          <ul class="tips-list-report">
+            <li>Asked to pay a registration or training fee</li>
+            <li>Only communicates via WhatsApp or Telegram</li>
+            <li>Promises unusually high salary (₹50,000+/month) with no experience</li>
+            <li>No formal interview — immediate joining</li>
+            <li>Uses a Gmail/Yahoo address instead of company email</li>
+            <li>Website is a free-hosted blog or looks unprofessional</li>
+          </ul>
+        </div>
+
+        <div class="report-info-card">
+          <h3>🛡️ What Happens Next?</h3>
+          <p>Our team reviews every report within 24 hours. Verified scam domains are added to our blacklist, which instantly protects all future users of the Verify Company tool.</p>
+        </div>
+
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}" alt="Graphura" class="graphura-logo">
+        <span>ScamShield</span>
+        <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
+      </div>
+      <div class="footer-links">
+        <a href="/" class="footer-link">Home</a>
+        <a href="/analyze-job" class="footer-link">Analyze Job</a>
+        <a href="/verify-company" class="footer-link">Verify Company</a>
+        <a href="/about" class="footer-link">About AI</a>
+      </div>
+      <div class="footer-note">
+        Built with NLP + Logistic Regression ML · 96% Accuracy · Protecting India's Youth
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

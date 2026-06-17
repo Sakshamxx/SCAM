@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Company Trust Analyzer — ScamShield AI by Graphura India</title>
+  <meta name="description" content="Verify company legitimacy, check recruiter trust scores, domain reputation and blacklist status before applying to any job or internship." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+{% include 'components/navbar.html' %}
+
+<div class="hero-bg-grid"></div>
+<section class="page-hero">
+  <div class="container">
+    <div class="page-hero-inner">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        Company Intelligence
+      </div>
+      <h1 class="page-hero-title">Company & Recruiter Verifier</h1>
+      <p class="page-hero-sub">Check domain reputation, detect brand impersonation, and assess recruiter trust before applying.</p>
+    </div>
+  </div>
+</section>
+
+<section class="dashboard-section">
+  <div class="container">
+
+    <!-- Verification Form -->
+    <div class="chart-card" style="max-width:680px; margin: 0 auto 30px;">
+      <div class="chart-card-header">
+        <h3>🌐 Domain / Website Verification</h3>
+        <span class="chart-badge">Company Trust Analyzer</span>
+      </div>
+      <form method="POST" style="padding: 8px 0;">
+        <div class="form-group">
+          <label class="form-label" for="url">Company Website or Job Posting URL</label>
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <input type="url" name="url" id="url" class="form-input"
+              placeholder="https://company-name.com" value="{{ checked_url or '' }}"
+              style="flex:1; min-width:200px;" required />
+            <button type="submit" class="hero-cta" style="padding: 13px 28px; font-size:0.95rem;">
+              🔍 Verify Now
+            </button>
+          </div>
+          <p style="color:var(--text-sub); font-size:0.8rem; margin-top:8px;">
+            Paste any job portal URL, recruiter website, or company link to check its trust score.
+          </p>
+        </div>
+      </form>
+    </div>
+
+    <!-- Recruiter Verification Form -->
+    <div class="chart-card" style="max-width:680px; margin: 0 auto 40px;">
+      <div class="chart-card-header">
+        <h3>👤 Recruiter Verification Check</h3>
+        <span class="chart-badge">Recruiter Trust assessment</span>
+      </div>
+      <form method="POST" action="/recruiter-check" style="padding: 8px 0;">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label" for="recruiter_name">Recruiter / HR Name (Optional)</label>
+          <input type="text" name="recruiter_name" id="recruiter_name" class="form-input"
+            placeholder="e.g. Priyan HR" value="{{ checked_name or '' }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="domain">Recruiter Email Domain or Company website</label>
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <input type="text" name="domain" id="domain" class="form-input"
+              placeholder="e.g. google.com or mail-hiring-verification.net" value="{{ checked_domain or '' }}"
+              style="flex:1; min-width:200px;" required />
+            <button type="submit" class="hero-cta" style="padding: 13px 28px; font-size:0.95rem; background: #8b5cf6;">
+              👤 Verify Recruiter
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    {% if recruiter_result %}
+    <!-- Recruiter Result Card -->
+    <div class="chart-card" style="max-width:680px; margin: 0 auto 40px;">
+      <div class="chart-card-header">
+        <h3>📊 Recruiter Assessment Result</h3>
+        {% if recruiter_result.status == 'Verified Trusted' or recruiter_result.status == 'Appears Safe' %}
+        <span class="chart-badge" style="background:rgba(16,185,129,0.2); color:#6ee7b7; border-radius:8px; padding:4px 12px;">
+        {% elif recruiter_result.status == 'Suspicious' or recruiter_result.status == 'Use Caution' %}
+        <span class="chart-badge" style="background:rgba(245,158,11,0.2); color:#fcd34d; border-radius:8px; padding:4px 12px;">
+        {% else %}
+        <span class="chart-badge" style="background:rgba(239,68,68,0.2); color:#fca5a5; border-radius:8px; padding:4px 12px;">
+        {% endif %}
+          {{ recruiter_result.status }}
+        </span>
+      </div>
+
+      <div style="padding:8px 0;">
+        <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px 20px; margin-bottom:20px; border:1px solid rgba(255,255,255,0.08);">
+          <div style="font-size:0.78rem; color:var(--text-sub); margin-bottom:4px;">Recruiter Profile Checked</div>
+          <div style="color:#e2e8f0; font-size:0.95rem;">
+            👤 Name: <strong>{{ recruiter_result.recruiter_name or 'Not Provided' }}</strong><br>
+            🌐 Website/Domain: <strong style="font-family:monospace; color:#a5b4fc;">{{ recruiter_result.domain or 'Not Provided' }}</strong>
+          </div>
+        </div>
+
+        <!-- Trust Score -->
+        <div style="margin-bottom:24px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span style="font-size:0.88rem; color:var(--text-sub);">Trust Score</span>
+            {% if recruiter_result.trust_score >= 65 %}
+            <span style="font-weight:700; font-size:1.1rem; color:#6ee7b7;">
+            {% elif recruiter_result.trust_score >= 40 %}
+            <span style="font-weight:700; font-size:1.1rem; color:#fcd34d;">
+            {% else %}
+            <span style="font-weight:700; font-size:1.1rem; color:#fca5a5;">
+            {% endif %}
+              {{ recruiter_result.trust_score }}/100
+            </span>
+          </div>
+          <div class="bar-track" style="height:14px; border-radius:8px;">
+            <div class="bar-fill {% if recruiter_result.trust_score >= 65 %}bar-green{% elif recruiter_result.trust_score >= 40 %}bar-yellow{% else %}bar-red{% endif %}"
+              id="recruiterBarFill" style="height:100%; border-radius:8px;"></div>
+            <script>
+              document.getElementById('recruiterBarFill').style.width = '{{ recruiter_result.trust_score }}%';
+            </script>
+          </div>
+        </div>
+
+        <!-- Reasons / Warnings -->
+        <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); border-radius:12px; padding:16px 20px; margin-bottom:20px;">
+          <div style="font-size:0.78rem; color:#a5b4fc; margin-bottom:6px; font-weight:600;">🔍 Recruiter Signals & Warnings</div>
+          {% for r in recruiter_result.reasons %}
+          <p style="color:#e2e8f0; font-size:0.9rem; line-height:1.6; margin:0 0 6px 0;">• {{ r }}</p>
+          {% endfor %}
+        </div>
+
+        <!-- Previous Reports -->
+        <div style="background:rgba(239,68,68,0.04); border:1px solid rgba(239,68,68,0.15); border-radius:12px; padding:16px 20px;">
+          <div style="font-size:0.78rem; color:#fca5a5; margin-bottom:6px; font-weight:600;">📋 Previous Community Reports ({{ recruiter_result.previous_reports|length }})</div>
+          {% for report in recruiter_result.previous_reports %}
+          <div style="border-bottom:1px solid rgba(255,255,255,0.05); padding:8px 0; margin-bottom:8px;">
+            <div style="font-weight:600; color:#e2e8f0; font-size:0.88rem;">🏢 {{ report.company }} ({{ report.created_at[:10] }})</div>
+            <p style="color:var(--text-sub); font-size:0.83rem; margin:4px 0 0 0;">{{ report.description }}</p>
+          </div>
+          {% else %}
+          <p style="color:var(--text-sub); font-size:0.88rem; margin:0;">No previous reports found for this recruiter or company in the community database.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if result %}
+    <!-- Result Card -->
+    <div class="chart-card" style="max-width:680px; margin: 0 auto 40px;">
+      <div class="chart-card-header">
+        <h3>📊 Verification Result</h3>
+        {% if result.risk_level == 'LOW' %}
+        <span class="chart-badge" id="trustStatusBadge" style="background:rgba(16,185,129,0.2); color:#6ee7b7; border-radius:8px; padding:4px 12px;">
+        {% elif result.risk_level == 'MEDIUM' %}
+        <span class="chart-badge" id="trustStatusBadge" style="background:rgba(245,158,11,0.2); color:#fcd34d; border-radius:8px; padding:4px 12px;">
+        {% elif result.risk_level == 'HIGH' %}
+        <span class="chart-badge" id="trustStatusBadge" style="background:rgba(239,68,68,0.2); color:#fca5a5; border-radius:8px; padding:4px 12px;">
+        {% else %}
+        <span class="chart-badge" id="trustStatusBadge" style="background:rgba(127,29,29,0.3); color:#fca5a5; border-radius:8px; padding:4px 12px;">
+        {% endif %}
+          {{ result.status }}
+        </span>
+      </div>
+
+      <div style="padding:8px 0;">
+        <!-- Verified URL -->
+        <div style="background:rgba(255,255,255,0.04); border-radius:12px; padding:16px 20px; margin-bottom:20px; border:1px solid rgba(255,255,255,0.08);">
+          <div style="font-size:0.78rem; color:var(--text-sub); margin-bottom:4px;">Analyzed URL</div>
+          <div style="font-family:monospace; color:#a5b4fc; word-break:break-all;">{{ result.url }}</div>
+        </div>
+
+        <!-- Trust Score Meter -->
+        <div style="margin-bottom:24px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span style="font-size:0.88rem; color:var(--text-sub);">Trust Score</span>
+            {% if result.trust_score >= 65 %}
+            <span style="font-weight:700; font-size:1.1rem; color:#6ee7b7;">
+            {% elif result.trust_score >= 40 %}
+            <span style="font-weight:700; font-size:1.1rem; color:#fcd34d;">
+            {% else %}
+            <span style="font-weight:700; font-size:1.1rem; color:#fca5a5;">
+            {% endif %}
+              {{ result.trust_score }}/100
+            </span>
+          </div>
+          <div class="bar-track" style="height:14px; border-radius:8px;">
+            <div class="bar-fill {% if result.trust_score >= 65 %}bar-green{% elif result.trust_score >= 40 %}bar-yellow{% else %}bar-red{% endif %}"
+              id="companyBarFill" style="height:100%; border-radius:8px;"></div>
+            <script>
+              document.getElementById('companyBarFill').style.width = '{{ result.trust_score }}%';
+            </script>
+          </div>
+        </div>
+
+        <!-- Risk Level / Domain Reputation -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+          <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:14px; text-align:center;">
+            <div style="font-size:0.75rem; color:var(--text-sub); margin-bottom:4px;">Risk Level</div>
+            {% if result.risk_level == 'LOW' %}
+            <div style="font-weight:700; color:#6ee7b7;">
+            {% elif result.risk_level == 'MEDIUM' %}
+            <div style="font-weight:700; color:#fcd34d;">
+            {% elif result.risk_level == 'HIGH' %}
+            <div style="font-weight:700; color:#fca5a5;">
+            {% else %}
+            <div style="font-weight:700; color:#f87171;">
+            {% endif %}
+              {{ result.risk_level }}
+            </div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); border-radius:10px; padding:14px; text-align:center;">
+            <div style="font-size:0.75rem; color:var(--text-sub); margin-bottom:4px;">Domain Reputation</div>
+            {% if result.trust_score >= 65 %}
+            <div style="font-weight:700; color:#6ee7b7;">
+            {% elif result.trust_score >= 40 %}
+            <div style="font-weight:700; color:#fcd34d;">
+            {% else %}
+            <div style="font-weight:700; color:#fca5a5;">
+            {% endif %}
+              {{ result.domain_reputation }}
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Summary -->
+        <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); border-radius:12px; padding:16px 20px; margin-bottom:20px;">
+          <div style="font-size:0.78rem; color:#a5b4fc; margin-bottom:6px; font-weight:600;">🤖 AI Summary</div>
+          <p style="color:#e2e8f0; font-size:0.9rem; line-height:1.6; margin:0;">{{ result.ai_summary }}</p>
+        </div>
+
+        <!-- Risk Indicators -->
+        <div style="background:rgba(239,68,68,0.04); border:1px solid rgba(239,68,68,0.2); border-radius:12px; padding:16px 20px;">
+          <div style="font-size:0.78rem; color:#fca5a5; margin-bottom:6px; font-weight:600;">🚩 Risk Indicators</div>
+          <ul style="color:#e2e8f0; font-size:0.9rem; line-height:1.6; padding-left: 20px; margin: 0;">
+            {% for indicator in result.risk_indicators %}
+            <li>{{ indicator }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex; gap:12px; margin-top:20px; flex-wrap:wrap;">
+          <a href="/analyze-job" class="hero-cta" style="font-size:0.88rem; padding:10px 22px;">
+            🔍 Analyze a Job Posting
+          </a>
+          <a href="/report-scam{% if result.url %}?company={{ result.url | urlencode }}{% endif %}"
+            style="background:rgba(239,68,68,0.1); color:#fca5a5; border:1px solid rgba(239,68,68,0.3);
+                   padding:10px 22px; border-radius:100px; font-size:0.88rem; text-decoration:none;">
+            ⚠️ Report This Domain
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Feature Info Cards -->
+    <div class="kpi-grid" style="max-width:900px; margin:0 auto 40px;">
+      <div class="kpi-card" style="text-align:center;">
+        <div class="kpi-icon" style="background:rgba(99,102,241,0.15); margin:0 auto 12px;">🛡️</div>
+        <div class="kpi-label" style="font-weight:600; color:#e2e8f0; margin-bottom:6px;">Blacklist Check</div>
+        <div style="font-size:0.8rem; color:var(--text-sub);">Cross-references our database of known scam domains</div>
+      </div>
+      <div class="kpi-card" style="text-align:center;">
+        <div class="kpi-icon" style="background:rgba(16,185,129,0.15); margin:0 auto 12px;">🔒</div>
+        <div class="kpi-label" style="font-weight:600; color:#e2e8f0; margin-bottom:6px;">SSL Verification</div>
+        <div style="font-size:0.8rem; color:var(--text-sub);">Checks for secure HTTPS encryption on the site</div>
+      </div>
+      <div class="kpi-card" style="text-align:center;">
+        <div class="kpi-icon" style="background:rgba(245,158,11,0.15); margin:0 auto 12px;">🏷️</div>
+        <div class="kpi-label" style="font-weight:600; color:#e2e8f0; margin-bottom:6px;">Brand Detection</div>
+        <div style="font-size:0.8rem; color:var(--text-sub);">Detects fake sites impersonating Google, TCS, Amazon etc.</div>
+      </div>
+      <div class="kpi-card" style="text-align:center;">
+        <div class="kpi-icon" style="background:rgba(239,68,68,0.15); margin:0 auto 12px;">📡</div>
+        <div class="kpi-label" style="font-weight:600; color:#e2e8f0; margin-bottom:6px;">Free Host Detection</div>
+        <div style="font-size:0.8rem; color:var(--text-sub);">Flags blogspot, wix, sites.google and other free hosts</div>
+      </div>
+    </div>
+
+    <!-- Recruiter Verification Guide -->
+    <div class="chart-card" style="max-width:900px; margin:0 auto 40px;">
+      <div class="chart-card-header">
+        <h3>👤 Recruiter Verification Guide</h3>
+        <span class="chart-badge">Trust Indicators</span>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:20px; padding:8px 0;">
+        <div style="border-left:3px solid #10b981; padding-left:16px;">
+          <div style="font-weight:600; color:#6ee7b7; margin-bottom:6px;">✅ Verified Recruiter Signs</div>
+          <ul style="color:var(--text-sub); font-size:0.85rem; list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;">
+            <li>• Official company email domain</li>
+            <li>• LinkedIn profile with history</li>
+            <li>• Verified company on Glassdoor</li>
+            <li>• Internshala / Naukri listing</li>
+            <li>• Clear interview process</li>
+          </ul>
+        </div>
+        <div style="border-left:3px solid #f59e0b; padding-left:16px;">
+          <div style="font-weight:600; color:#fcd34d; margin-bottom:6px;">⚠️ Suspicious Signs</div>
+          <ul style="color:var(--text-sub); font-size:0.85rem; list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;">
+            <li>• WhatsApp-only communication</li>
+            <li>• Gmail / Yahoo email for HR</li>
+            <li>• No verifiable company address</li>
+            <li>• Vague job description</li>
+            <li>• Pressure to join instantly</li>
+          </ul>
+        </div>
+        <div style="border-left:3px solid #ef4444; padding-left:16px;">
+          <div style="font-weight:600; color:#fca5a5; margin-bottom:6px;">🚨 Blacklisted Signs</div>
+          <ul style="color:var(--text-sub); font-size:0.85rem; list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;">
+            <li>• Registration / training fee demand</li>
+            <li>• Security deposit required</li>
+            <li>• Asks for Aadhaar/PAN upfront</li>
+            <li>• No physical address or website</li>
+            <li>• Unrealistic salary promised</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}" alt="Graphura" class="graphura-logo">
+        <span>ScamShield</span>
+        <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
+      </div>
+      <div class="footer-links">
+        <a href="/" class="footer-link">Home</a>
+        <a href="/analyze-job" class="footer-link">Analyze Job</a>
+        <a href="/community" class="footer-link">Community</a>
+        <a href="/about" class="footer-link">About AI</a>
+      </div>
+      <div class="footer-note">ScamShield AI · Employment Fraud Intelligence Platform · Graphura India</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

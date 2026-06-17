@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Offer Letter Scanner — ScamShield by Graphura India</title>
+  <meta name="description" content="Upload an offer letter PDF and let ScamShield AI detect registration fees, security deposits, and other fraud signals." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    .upload-zone {
+      border: 2px dashed rgba(99,102,241,0.4);
+      border-radius: 16px;
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(99,102,241,0.04);
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: rgba(99,102,241,0.8);
+      background: rgba(99,102,241,0.08);
+    }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-icon { font-size: 3rem; margin-bottom: 12px; }
+    .upload-title { font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px; }
+    .upload-sub { font-size: 0.85rem; color: var(--text-sub); }
+    .upload-btn { display: inline-block; margin-top: 16px; padding: 8px 20px; background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); border-radius: 100px; color: #a5b4fc; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+    .file-selected { margin-top: 12px; padding: 10px 16px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.3); border-radius: 10px; font-size: 0.85rem; color: #6ee7b7; display: none; }
+    .risk-factor-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; }
+    .risk-factor-item.detected { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); }
+    .risk-factor-item.clean { background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); }
+    .rf-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .rf-title { font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
+    .rf-desc { font-size: 0.78rem; color: var(--text-sub); margin-top: 2px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+{% include 'components/navbar.html' %}
+
+<!-- ── PAGE HERO ── -->
+<div class="hero-bg-grid"></div>
+<section class="page-hero">
+  <div class="container">
+    <div class="page-hero-inner">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        Offer Letter Intelligence
+      </div>
+      <h1 class="page-hero-title">Offer Letter Scanner</h1>
+      <p class="page-hero-sub">Upload a PDF offer letter to detect registration fees, deposit requests, and other fraud signals.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── MODE TABS ── -->
+<section style="padding:0;">
+  <div class="container">
+    <div style="display:flex; gap:12px; border-bottom:1px solid var(--border); padding-bottom:0;">
+      <a href="/analyze-job" style="padding:10px 20px; font-size:0.88rem; font-weight:600; color:var(--text-sub); border-bottom:2px solid transparent; text-decoration:none;">📋 Analyze Job Text</a>
+      <a href="/offer-letter" style="padding:10px 20px; font-size:0.88rem; font-weight:600; color:#a5b4fc; border-bottom:2px solid #6366f1; text-decoration:none;">📄 Offer Letter Scanner</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── MAIN CONTENT ── -->
+<section class="analyzer-section" id="offer-letter">
+  <div class="container">
+    <div class="analyzer-wrapper">
+
+      <!-- LEFT — UPLOAD FORM -->
+      <div class="form-panel">
+        <div class="form-header">
+          <h2>Upload Offer Letter</h2>
+          <p>Supports PDF files up to 5 MB. Text is extracted and analyzed locally.</p>
+        </div>
+
+        <form id="offerLetterForm" enctype="multipart/form-data" autocomplete="off">
+
+          <!-- Drop Zone -->
+          <div class="upload-zone" id="uploadZone" onclick="document.getElementById('pdfFile').click()">
+            <input type="file" id="pdfFile" name="pdf" accept=".pdf" required />
+            <div class="upload-icon">📄</div>
+            <div class="upload-title">Drop your offer letter here</div>
+            <div class="upload-sub">or click to browse files</div>
+            <span class="upload-btn">Browse PDF</span>
+          </div>
+          <div class="file-selected" id="fileSelected">
+            <span id="fileSelectedName">No file chosen</span>
+          </div>
+
+          <!-- Optional context -->
+          <div class="form-row two-col" style="margin-top: 20px;">
+            <div class="form-group">
+              <label for="ol_company">Company Name (optional)</label>
+              <input type="text" id="ol_company" name="company" placeholder="e.g. FakeCorp Pvt Ltd" />
+            </div>
+            <div class="form-group">
+              <label for="ol_recruiter_email">Recruiter Email (optional)</label>
+              <input type="email" id="ol_recruiter_email" name="recruiter_email" placeholder="e.g. hr@company.com" />
+            </div>
+          </div>
+
+          <div class="analyze-btn-row" style="margin-top: 20px;">
+            <button type="submit" class="analyze-btn" id="scanBtn">
+              <span class="btn-icon">🔍</span>
+              <span class="btn-text">Scan Offer Letter</span>
+              <span class="btn-loader" style="display:none">
+                <span class="spinner"></span> Scanning...
+              </span>
+            </button>
+          </div>
+        </form>
+
+        <!-- WHAT WE CHECK -->
+        <div style="margin-top:28px; padding:20px; background:var(--card); border-radius:14px; border:1px solid var(--border);">
+          <div style="font-size:0.78rem; color:var(--text-sub); font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:14px;">WHAT WE CHECK</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:8px; font-size:0.84rem; color:var(--text-sub);"><span>💸</span> Registration fee / training fee mentions</div>
+            <div style="display:flex; gap:8px; font-size:0.84rem; color:var(--text-sub);"><span>🔒</span> Security deposit requests</div>
+            <div style="display:flex; gap:8px; font-size:0.84rem; color:var(--text-sub);"><span>👤</span> Suspicious recruiter information</div>
+            <div style="display:flex; gap:8px; font-size:0.84rem; color:var(--text-sub);"><span>💰</span> Unrealistic salary claims</div>
+            <div style="display:flex; gap:8px; font-size:0.84rem; color:var(--text-sub);"><span>📧</span> Personal email usage (Gmail/Yahoo)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT — RESULTS PANEL -->
+      <div class="results-panel" id="olResultsPanel">
+
+        <!-- IDLE -->
+        <div id="olIdleState" class="results-idle">
+          <div class="idle-icon">📄</div>
+          <h3>Offer Letter Intelligence</h3>
+          <p>Upload a PDF offer letter and our AI will detect fraud signals instantly</p>
+          <div style="margin-top:24px; padding:16px; background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:12px;">
+            <p style="color:#fcd34d; font-size:0.84rem; margin:0; line-height:1.6;">⚠️ <strong>Common Scam Signals:</strong> Genuine companies never ask for upfront payments, security deposits, or registration fees in an offer letter.</p>
+          </div>
+        </div>
+
+        <!-- LOADING -->
+        <div id="olLoadingState" style="display:none; text-align:center; padding:40px 20px;">
+          <div style="font-size:3rem; margin-bottom:16px;">🔍</div>
+          <h3 style="color:var(--text-main); margin-bottom:8px;">Scanning PDF...</h3>
+          <p style="color:var(--text-sub); font-size:0.87rem;">Extracting text, running ML analysis and Groq AI</p>
+        </div>
+
+        <!-- RESULTS -->
+        <div id="olResultsState" style="display:none;">
+
+          <!-- Verdict header -->
+          <div id="olVerdictBadge" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; padding:14px 18px; border-radius:14px; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2);">
+            <div>
+              <div style="font-size:0.72rem; color:#a5b4fc; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px;">VERDICT</div>
+              <div id="olVerdictText" style="font-size:1rem; font-weight:700; color:var(--text-main);">—</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:0.72rem; color:var(--text-sub); margin-bottom:3px;">RISK SCORE</div>
+              <div id="olRiskScore" style="font-size:1.8rem; font-weight:800; color:#a5b4fc;">—</div>
+            </div>
+          </div>
+
+          <!-- Risk Factors -->
+          <div style="margin-bottom:16px; padding:14px 16px; background:var(--card); border-radius:12px; border:1px solid var(--border);">
+            <div style="font-size:0.75rem; color:var(--text-sub); font-weight:600; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.04em;">🚩 Risk Factors</div>
+            <div id="olRiskFactors"></div>
+          </div>
+
+          <!-- AI Explanation -->
+          <div id="olAiExplanation" style="display:none; margin-bottom:16px; padding:14px 16px; background:rgba(99,102,241,0.08); border-radius:12px; border:1px solid rgba(99,102,241,0.2);">
+            <div style="font-size:0.75rem; color:#a5b4fc; font-weight:600; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.04em;">🤖 AI Explanation</div>
+            <p id="olAiText" style="color:#e2e8f0; font-size:0.87rem; line-height:1.7; margin:0;"></p>
+          </div>
+
+          <!-- Recommendations -->
+          <div id="olRecsSection" style="display:none; margin-bottom:16px; padding:14px 16px; background:var(--card); border-radius:12px; border:1px solid var(--border);">
+            <div style="font-size:0.75rem; color:var(--text-sub); font-weight:600; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.04em;">✅ Recommendations</div>
+            <ul id="olRecsList" style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;"></ul>
+          </div>
+
+          <!-- Actions -->
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="olDownloadBtn" class="analyze-btn" style="flex:1; font-size:0.84rem; padding:10px 16px;" onclick="downloadOfferReport()">
+              📄 Download Report
+            </button>
+            <a href="/report-scam" id="olReportBtn" class="clear-btn" style="flex:1; text-align:center; font-size:0.84rem; padding:10px 16px; text-decoration:none;">
+              ⚠️ Report Scam
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}" alt="Graphura" class="graphura-logo">
+        <span>ScamShield</span>
+        <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
+      </div>
+      <div class="footer-links">
+        <a href="/" class="footer-link">Home</a>
+        <a href="/analyze-job" class="footer-link">Analyze Job</a>
+        <a href="/dashboard" class="footer-link">Dashboard</a>
+        <a href="/offer-letter" class="footer-link">Offer Letter</a>
+      </div>
+      <div class="footer-note">
+        Built with NLP + Logistic Regression ML · 96% Accuracy · Protecting India's Youth
+      </div>
+    </div>
+  </div>
+</footer>
+
+<div class="scrape-toast" id="scrapeToast"></div>
+
+<script>
+// ── Drag-and-drop upload zone ───────────────────────────────────────────────
+const uploadZone = document.getElementById('uploadZone');
+const pdfFile    = document.getElementById('pdfFile');
+const fileSelected = document.getElementById('fileSelected');
+const fileSelectedName = document.getElementById('fileSelectedName');
+
+if (pdfFile) {
+  pdfFile.addEventListener('change', () => {
+    if (pdfFile.files[0]) {
+      fileSelectedName.textContent = '📎 ' + pdfFile.files[0].name;
+      fileSelected.style.display = 'block';
+    }
+  });
+}
+
+if (uploadZone) {
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0] && e.dataTransfer.files[0].type === 'application/pdf') {
+      const dt = new DataTransfer();
+      dt.items.add(e.dataTransfer.files[0]);
+      pdfFile.files = dt.files;
+      fileSelectedName.textContent = '📎 ' + e.dataTransfer.files[0].name;
+      fileSelected.style.display = 'block';
+    }
+  });
+}
+
+// ── Form submit ─────────────────────────────────────────────────────────────
+let _lastOfferData = null;
+
+const olForm = document.getElementById('offerLetterForm');
+if (olForm) {
+  olForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (!pdfFile.files[0]) { alert('Please select a PDF file first.'); return; }
+
+    const btn     = document.getElementById('scanBtn');
+    const btnText = btn ? btn.querySelector('.btn-text') : null;
+    const btnLoad = btn ? btn.querySelector('.btn-loader') : null;
+
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.style.display = 'none';
+    if (btnLoad) btnLoad.style.display = 'flex';
+
+    document.getElementById('olIdleState').style.display    = 'none';
+    document.getElementById('olLoadingState').style.display = 'block';
+    document.getElementById('olResultsState').style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('pdf', pdfFile.files[0]);
+    formData.append('company', document.getElementById('ol_company').value.trim());
+    formData.append('recruiter_email', document.getElementById('ol_recruiter_email').value.trim());
+
+    try {
+      const res  = await fetch('/offer-letter/analyze', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      _lastOfferData = data;
+      renderOfferResults(data);
+    } catch (err) {
+      document.getElementById('olIdleState').style.display    = 'block';
+      document.getElementById('olLoadingState').style.display = 'none';
+      alert('Error: ' + (err.message || 'Could not scan the PDF. Please try again.'));
+    } finally {
+      if (btn) btn.disabled = false;
+      if (btnText) btnText.style.display = 'inline';
+      if (btnLoad) btnLoad.style.display = 'none';
+    }
+  });
+}
+
+function renderOfferResults(data) {
+  document.getElementById('olLoadingState').style.display = 'none';
+  document.getElementById('olResultsState').style.display = 'block';
+
+  const colorMap = { LOW: '#10b981', MEDIUM: '#f59e0b', HIGH: '#ef4444', CRITICAL: '#7c3aed' };
+  const accent   = colorMap[data.risk_level] || '#6366f1';
+
+  document.getElementById('olVerdictText').textContent   = data.risk_label || '—';
+  document.getElementById('olRiskScore').textContent     = Math.round(data.risk_score) + '/100';
+  document.getElementById('olRiskScore').style.color     = accent;
+  document.getElementById('olVerdictBadge').style.borderColor = accent + '55';
+
+  // Risk Factors
+  const rfContainer = document.getElementById('olRiskFactors');
+  rfContainer.innerHTML = '';
+  const factors = data.risk_factors || [];
+  factors.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'risk-factor-item ' + (f.detected ? 'detected' : 'clean');
+    div.innerHTML = `
+      <span class="rf-icon">${f.detected ? '🔴' : '✅'}</span>
+      <div>
+        <div class="rf-title">${f.name}</div>
+        <div class="rf-desc">${f.detail}</div>
+      </div>`;
+    rfContainer.appendChild(div);
+  });
+
+  // AI Explanation
+  if (data.ai_explanation) {
+    document.getElementById('olAiText').textContent = data.ai_explanation;
+    document.getElementById('olAiExplanation').style.display = 'block';
+  }
+
+  // Recommendations
+  if (data.recommendations && data.recommendations.length) {
+    const list = document.getElementById('olRecsList');
+    list.innerHTML = data.recommendations.map(r =>
+      `<li style="display:flex; gap:8px; align-items:flex-start; color:#cbd5e1; font-size:0.84rem; line-height:1.6;"><span style="color:#10b981; flex-shrink:0;">→</span>${r}</li>`
+    ).join('');
+    document.getElementById('olRecsSection').style.display = 'block';
+  }
+
+  // Update report link
+  if (data.company) {
+    document.getElementById('olReportBtn').href = '/report-scam?company=' + encodeURIComponent(data.company);
+  }
+}
+
+async function downloadOfferReport() {
+  if (!_lastOfferData) { alert('No analysis data to download.'); return; }
+  const btn = document.getElementById('olDownloadBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating...'; }
+  try {
+    const resp = await fetch('/offer-letter/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_lastOfferData)
+    });
+    if (!resp.ok) throw new Error('PDF generation failed');
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `scamshield_offer_report_${Date.now()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Could not generate PDF: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📄 Download Report'; }
+  }
+}
+</script>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

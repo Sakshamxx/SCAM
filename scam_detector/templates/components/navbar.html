@@ -1,0 +1,127 @@
+<!-- ── REUSABLE NAVBAR COMPONENT ── -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <img
+        src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}"
+        alt="Graphura"
+        class="graphura-logo"
+      >
+      <span class="logo-text">ScamShield <span style="font-size:0.7em; color:#a5b4fc; font-weight:500;">AI</span></span>
+    </a>
+    
+    <button class="nav-mobile-toggle" id="navMobileToggle" aria-label="Toggle Navigation">
+      ☰
+    </button>
+    
+    <div class="nav-links" id="navLinks">
+      <a href="/" class="nav-link">Home</a>
+      <a href="/analyze-job" class="nav-link">Analyze Job</a>
+      <a href="/awareness" class="nav-link">Awareness</a>
+      <a href="/community" class="nav-link">Community</a>
+      <a href="/threat-intel" class="nav-link">Threat Intel</a>
+      <a href="/about" class="nav-link">About AI</a>
+      
+      {% if session.get('user') %}
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        {% if session.get('is_admin') %}
+          <a href="/admin" class="nav-link">Admin</a>
+        {% endif %}
+        
+        <div class="user-menu" id="userMenu">
+          <div class="user-trigger" id="userTrigger">
+            <div class="user-avatar">
+              {{ session.get('user')[0] | upper }}
+            </div>
+            <span>👤 {{ session.get('user') }}</span>
+            <span class="user-trigger-arrow">▼</span>
+          </div>
+          <div class="user-dropdown">
+            {% if session.get('is_admin') %}
+              <a href="/admin" class="dropdown-item">⚙️ Admin Portal</a>
+            {% endif %}
+            <a href="/dashboard" class="dropdown-item">📊 Dashboard</a>
+            <a href="/analyze-job" class="dropdown-item">🔍 Analyze Job</a>
+            <a href="/verify-company" class="dropdown-item">🌐 Verify Company</a>
+            <a href="/domain-check" class="dropdown-item">🛡️ Domain Check</a>
+            <a href="/community" class="dropdown-item">👥 Community</a>
+            <a href="/threat-intel" class="dropdown-item">🔴 Threat Intel</a>
+            <a href="/awareness" class="dropdown-item">📖 Awareness Hub</a>
+            <a href="/report-scam" class="dropdown-item">⚠️ Report Scam</a>
+            <div class="dropdown-divider"></div>
+            <a href="/logout" class="dropdown-item logout">🚪 Logout</a>
+          </div>
+        </div>
+      {% else %}
+        <a href="/login" class="nav-link">Login</a>
+        <a href="/signup" class="nav-btn">Sign Up</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+
+<!-- Toast Container (global) -->
+<div id="toastContainer" style="position:fixed; top:80px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px; pointer-events:none;"></div>
+
+<script>
+  // Mobile navigation toggle
+  const mobileToggle = document.getElementById('navMobileToggle');
+  const navLinks = document.getElementById('navLinks');
+  if (mobileToggle && navLinks) {
+    mobileToggle.addEventListener('click', () => {
+      navLinks.classList.toggle('show');
+    });
+  }
+
+  // User dropdown toggle
+  const userTrigger = document.getElementById('userTrigger');
+  const userMenu = document.getElementById('userMenu');
+  if (userTrigger && userMenu) {
+    userTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userMenu.classList.toggle('active');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!userMenu.contains(e.target)) {
+        userMenu.classList.remove('active');
+      }
+    });
+  }
+
+  // Active link highlighting
+  document.addEventListener('DOMContentLoaded', () => {
+    const currentPath = window.location.pathname;
+    const links = document.querySelectorAll('.nav-link');
+    links.forEach(link => {
+      const href = link.getAttribute('href');
+      if (currentPath === href) {
+        link.classList.add('active');
+      } else {
+        link.classList.remove('active');
+      }
+    });
+  });
+
+  // Global toast notification system
+  function showGlobalToast(message, type = 'success', duration = 3500) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      background:${type === 'error' ? 'rgba(239,68,68,0.95)' : type === 'warning' ? 'rgba(245,158,11,0.95)' : 'rgba(16,185,129,0.95)'};
+      color:#fff; padding:12px 20px; border-radius:12px; font-size:0.88rem; font-weight:500;
+      font-family:Inter,sans-serif; max-width:320px; word-break:break-word;
+      box-shadow:0 8px 32px rgba(0,0,0,0.3); pointer-events:auto;
+      opacity:0; transform:translateX(20px); transition:all 0.3s ease;
+    `;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '1'; toast.style.transform = 'translateX(0)'; }, 10);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(20px)';
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+  }
+</script>

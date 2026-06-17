@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics Dashboard — ScamShield by Graphura India</title>
+  <meta name="description" content="ScamShield analytics dashboard. Track scam detection rates, common indicators, analysis trends and recent job analyses." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<!-- ── NAVBAR ── -->
+{% include 'components/navbar.html' %}
+
+<!-- ── PAGE HERO ── -->
+<div class="hero-bg-grid"></div>
+<section class="page-hero">
+  <div class="container">
+    <div class="page-hero-inner">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        Analytics Dashboard
+      </div>
+      <h1 class="page-hero-title">Detection Analytics</h1>
+      <p class="page-hero-sub">Your personal scam detection history and activity — powered by Supabase.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── DASHBOARD CONTENT ── -->
+<section class="dashboard-section">
+  <div class="container">
+
+    {% if error %}
+      <div class="auth-error" style="margin-bottom: 24px;">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 28px;">
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(99,102,241,0.15)">📊</div>
+        <div class="kpi-body">
+          <div class="kpi-value" id="kpiTotal">{{ global_total_jobs }}</div>
+          <div class="kpi-label">Total Jobs Analyzed</div>
+          <div class="kpi-trend kpi-trend-neutral">System-wide count</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(239,68,68,0.15)">🚨</div>
+        <div class="kpi-body">
+          <div class="kpi-value kpi-value-red" id="kpiScams">{{ global_scams_detected }}</div>
+          <div class="kpi-label">Scams Detected</div>
+          <div class="kpi-trend kpi-trend-neutral">Threats blocked</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(245,158,11,0.15)">📝</div>
+        <div class="kpi-body">
+          <div class="kpi-value kpi-value-yellow" id="kpiReports">{{ community_reports_count }}</div>
+          <div class="kpi-label">Community Reports</div>
+          <div class="kpi-trend kpi-trend-neutral">Student submissions</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(239,68,68,0.15)">🌐</div>
+        <div class="kpi-body">
+          <div class="kpi-value kpi-value-red" id="kpiDomains">{{ high_risk_domains_count }}</div>
+          <div class="kpi-label">High Risk Domains</div>
+          <div class="kpi-trend kpi-trend-neutral">Blacklisted links</div>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(16,185,129,0.15)">✅</div>
+        <div class="kpi-body">
+          <div class="kpi-value kpi-value-green" id="kpiRecruiters">{{ verified_recruiters_count }}</div>
+          <div class="kpi-label">Verified Recruiters</div>
+          <div class="kpi-trend kpi-trend-neutral">Trusted agencies</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row">
+
+      <!-- Chart 1: Risk Distribution Chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3>Risk Distribution Chart</h3>
+          <span class="chart-badge">Overall System Threat Levels</span>
+        </div>
+        <div style="padding: 12px 0; display: flex; flex-direction: column; gap: 14px;">
+          <!-- Low Risk Bar -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
+              <span style="color: #6ee7b7; font-weight: 500;">🟢 Low Risk (Safe)</span>
+              <span style="color: #fff; font-weight: 600;">{{ low_count }} analyses</span>
+            </div>
+            <div class="bar-track" style="height: 10px;">
+              <div class="bar-fill bar-green" style="width: {{ (low_count / (global_total_jobs or 1) * 100) | round(1) }}%; height: 100%;"></div>
+            </div>
+          </div>
+          <!-- Medium Risk Bar -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
+              <span style="color: #fcd34d; font-weight: 500;">🟡 Medium Risk (Suspicious)</span>
+              <span style="color: #fff; font-weight: 600;">{{ med_count }} analyses</span>
+            </div>
+            <div class="bar-track" style="height: 10px;">
+              <div class="bar-fill bar-yellow" style="width: {{ (med_count / (global_total_jobs or 1) * 100) | round(1) }}%; height: 100%;"></div>
+            </div>
+          </div>
+          <!-- High Risk Bar -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
+              <span style="color: #fca5a5; font-weight: 500;">🔴 High Risk (Probable Scam)</span>
+              <span style="color: #fff; font-weight: 600;">{{ high_count }} analyses</span>
+            </div>
+            <div class="bar-track" style="height: 10px;">
+              <div class="bar-fill bar-orange" style="width: {{ (high_count / (global_total_jobs or 1) * 100) | round(1) }}%; height: 100%;"></div>
+            </div>
+          </div>
+          <!-- Critical Risk Bar -->
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px;">
+              <span style="color: #f87171; font-weight: 500;">🚨 Critical Risk (Scam Alert)</span>
+              <span style="color: #fff; font-weight: 600;">{{ crit_count }} analyses</span>
+            </div>
+            <div class="bar-track" style="height: 10px;">
+              <div class="bar-fill bar-red" style="width: {{ (crit_count / (global_total_jobs or 1) * 100) | round(1) }}%; height: 100%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart 2: Common Fraud Keywords Chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3>Common Fraud Keywords Chart</h3>
+          <span class="chart-badge">Scam Phrases Detected</span>
+        </div>
+        <div class="indicator-bars" style="padding: 8px 0;">
+          {% for item in kw_chart_data %}
+          <div class="indicator-bar-item" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <div class="indicator-label" style="text-transform: capitalize; font-size: 0.82rem; width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ item.keyword }}">
+              ⚠️ {{ item.keyword }}
+            </div>
+            <div class="bar-track" style="flex:1; height: 10px;">
+              <div class="bar-fill bar-red" style="width: {{ item.pct }}%; height: 100%; border-radius: 4px;"></div>
+            </div>
+            <div class="indicator-count" style="font-weight: 700; color: #e2e8f0; font-size: 0.85rem; width: 30px; text-align: right;">
+              {{ item.count }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Scam Trend Chart -->
+    <div class="chart-card trend-chart-card" style="margin-bottom: 32px;">
+      <div class="chart-card-header">
+        <h3>Scam Trend Chart</h3>
+        <span class="chart-badge">Weekly scam vs legitimate analysis history</span>
+      </div>
+      <div class="trend-chart-wrapper" style="padding: 16px 0;">
+        <svg viewBox="0 0 800 160" class="trend-svg" preserveAspectRatio="none" style="overflow: visible;">
+          <!-- Grid lines -->
+          <line x1="0" y1="40"  x2="800" y2="40"  stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+          <line x1="0" y1="80"  x2="800" y2="80"  stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+          <line x1="0" y1="120" x2="800" y2="120" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+          
+          <!-- Area fill (scams — red) -->
+          <path d="{{ scam_fill_path }}" fill="rgba(239,68,68,0.12)" />
+          <!-- Area fill (safe — green) -->
+          <path d="{{ safe_fill_path }}" fill="rgba(16,185,129,0.12)" />
+          
+          <!-- Safe line -->
+          <polyline points="{% for pt in safe_points %}{{ pt[0] }},{{ pt[1] }} {% endfor %}"
+            fill="none" stroke="#10b981" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <!-- Scam line -->
+          <polyline points="{% for pt in scam_points %}{{ pt[0] }},{{ pt[1] }} {% endfor %}"
+            fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+            
+          <!-- Data points — Safe -->
+          {% for pt in safe_points %}
+          <circle cx="{{ pt[0] }}" cy="{{ pt[1] }}" r="4.5" fill="#10b981" />
+          {% endfor %}
+          
+          <!-- Data points — Scam -->
+          {% for pt in scam_points %}
+          <circle cx="{{ pt[0] }}" cy="{{ pt[1] }}" r="4.5" fill="#ef4444" />
+          {% endfor %}
+          
+          <!-- Week labels -->
+          {% for label in trend_labels %}
+          <text x="{{ 50 + loop.index0 * 100 }}" y="158" text-anchor="middle" fill="#475569" font-size="10" font-family="Inter">{{ label }}</text>
+          {% endfor %}
+        </svg>
+        <div class="trend-legend" style="margin-top: 14px; display: flex; gap: 16px; justify-content: center;">
+          <div class="donut-legend-item">
+            <span class="legend-dot" style="background:#10b981; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;"></span>
+            <span class="legend-label">Safe Jobs</span>
+          </div>
+          <div class="donut-legend-item">
+            <span class="legend-dot" style="background:#ef4444; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;"></span>
+            <span class="legend-label">Scams Detected</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Analyses Table -->
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <h3>Recent Analyses</h3>
+        <a href="/analyze-job" class="chart-badge chart-badge-link">+ New Analysis</a>
+      </div>
+      <div class="recent-table-wrapper">
+        <table class="recent-table">
+          <thead>
+            <tr>
+              <th>Job Text</th>
+              <th>Prediction</th>
+              <th>Risk Score</th>
+              <th>Confidence</th>
+              <th>Created At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in history %}
+            <tr>
+              <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ item.job_text }}">{{ item.job_text }}</td>
+              <td>
+                {% if item.risk_level == 'Scam' %}
+                <span class="verdict-badge verdict-scam">🚨 Scam</span>
+                {% elif item.risk_level == 'Suspicious' %}
+                <span class="verdict-badge verdict-suspicious">⚠️ Suspicious</span>
+                {% else %}
+                <span class="verdict-badge verdict-safe">✅ Legitimate</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="score-chip {% if item.risk_score >= 80 %}score-critical{% elif item.risk_score >= 60 %}score-high{% elif item.risk_score >= 30 %}score-medium{% else %}score-safe{% endif %}">
+                  {{ item.risk_score }}
+                </span>
+              </td>
+              <td>{{ item.confidence | round | int }}%</td>
+              <td class="table-date">{{ item.created_at[:19].replace('T', ' ') if item.created_at else '' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" style="text-align: center; color: #94a3b8; padding: 24px;">No analysis records found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- My Activity Logs -->
+    <div class="chart-card" style="margin-top: 32px;">
+      <div class="chart-card-header">
+        <h3>My Activity Log</h3>
+        <span class="chart-badge">Your Account Events</span>
+      </div>
+      <div class="recent-table-wrapper">
+        <table class="recent-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Action</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in activity_logs %}
+            <tr>
+              <td>👤 {{ log.username }}</td>
+              <td>
+                <span class="verdict-badge {% if 'Scam' in log.action or 'Logged Out' in log.action %}verdict-scam{% elif 'Created' in log.action or 'Logged In' in log.action %}verdict-safe{% else %}verdict-suspicious{% endif %}">
+                  {{ log.action }}
+                </span>
+              </td>
+              <td class="table-date">{{ log.created_at[:19].replace('T', ' ') if log.created_at else '' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="3" style="text-align: center; color: #94a3b8; padding: 24px;">No activity logs found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="table-footer-note">
+        🔒 System activity tracked live via Supabase
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img
+          src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}"
+          alt="Graphura"
+          class="graphura-logo"
+        >
+        <span>ScamShield</span>
+        <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
+      </div>
+      <div class="footer-links">
+        <a href="/" class="footer-link">Home</a>
+        <a href="/analyze-job" class="footer-link">Analyze Job</a>
+        <a href="/dashboard" class="footer-link">Dashboard</a>
+        <a href="/about" class="footer-link">About AI</a>
+      </div>
+      <div class="footer-note">
+        Built with NLP + Logistic Regression ML · 96% Accuracy · Protecting India's Youth
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign Up — ScamShield</title>
+  <meta name="description" content="Create a ScamShield account to track and analyze job listings." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body class="auth-page">
+
+  <div class="hero-bg-grid"></div>
+
+  <div class="auth-card">
+    <a href="/" class="auth-logo">
+      <img
+        src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}"
+        alt="Graphura Logo"
+        class="graphura-logo"
+      >
+      <span class="logo-text">ScamShield</span>
+    </a>
+
+    <h2 class="auth-title">Create Account</h2>
+    <p class="auth-subtitle">Get started with ScamShield by Graphura</p>
+
+    {% if error %}
+      <div class="auth-error">
+        {{ error }}
+      </div>
+    {% endif %}
+
+    <div class="auth-error" id="jsError" style="display: none;"></div>
+
+    <form class="auth-form" method="POST" id="signupForm">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="Choose a username"
+          required
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <div class="input-container">
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Create password"
+            required
+          >
+          <button type="button" class="password-toggle" id="passwordToggle" aria-label="Toggle Password Visibility">
+            👁️
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="confirm_password">Confirm Password</label>
+        <div class="input-container">
+          <input
+            type="password"
+            id="confirm_password"
+            name="confirm_password"
+            placeholder="Confirm password"
+            required
+          >
+          <button type="button" class="password-toggle" id="confirmPasswordToggle" aria-label="Toggle Confirm Password Visibility">
+            👁️
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="auth-btn">Sign Up</button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="/login">Log In</a>
+    </div>
+  </div>
+
+  <script>
+    const passwordInput = document.getElementById('password');
+    const passwordToggle = document.getElementById('passwordToggle');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+    const confirmPasswordToggle = document.getElementById('confirmPasswordToggle');
+    const signupForm = document.getElementById('signupForm');
+    const jsError = document.getElementById('jsError');
+
+    if (passwordInput && passwordToggle) {
+      passwordToggle.addEventListener('click', () => {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        passwordToggle.textContent = type === 'password' ? '👁️' : '🙈';
+      });
+    }
+
+    if (confirmPasswordInput && confirmPasswordToggle) {
+      confirmPasswordToggle.addEventListener('click', () => {
+        const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        confirmPasswordInput.setAttribute('type', type);
+        confirmPasswordToggle.textContent = type === 'password' ? '👁️' : '🙈';
+      });
+    }
+
+    if (signupForm) {
+      signupForm.addEventListener('submit', (e) => {
+        if (passwordInput.value !== confirmPasswordInput.value) {
+          e.preventDefault();
+          jsError.textContent = "Passwords do not match.";
+          jsError.style.display = "flex";
+        } else {
+          jsError.style.display = "none";
+        }
+      });
+    }
+  </script>
+</body>
+</html>
