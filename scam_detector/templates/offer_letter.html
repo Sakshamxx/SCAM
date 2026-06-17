@@ -80,16 +80,33 @@
 
         <form id="offerLetterForm" enctype="multipart/form-data" autocomplete="off">
 
-          <!-- Drop Zone -->
-          <div class="upload-zone" id="uploadZone" onclick="document.getElementById('pdfFile').click()">
-            <input type="file" id="pdfFile" name="pdf" accept=".pdf" required />
-            <div class="upload-icon">📄</div>
-            <div class="upload-title">Drop your offer letter here</div>
-            <div class="upload-sub">or click to browse files</div>
-            <span class="upload-btn">Browse PDF</span>
+          <!-- Source Selection Tabs -->
+          <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:10px;">
+            <button type="button" id="tabUpload" onclick="setSourceMode('upload')" style="background:none; border:none; color:#a5b4fc; font-size:0.85rem; font-weight:600; cursor:pointer; padding:5px 10px; border-bottom:2px solid #6366f1; transition: all 0.2s;">📁 File Upload</button>
+            <button type="button" id="tabUrl" onclick="setSourceMode('url')" style="background:none; border:none; color:var(--text-sub); font-size:0.85rem; font-weight:600; cursor:pointer; padding:5px 10px; border-bottom:2px solid transparent; transition: all 0.2s;">🌐 PDF URL</button>
           </div>
-          <div class="file-selected" id="fileSelected">
-            <span id="fileSelectedName">No file chosen</span>
+
+          <!-- Drop Zone (File Upload) -->
+          <div id="uploadContainer">
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('pdfFile').click()">
+              <input type="file" id="pdfFile" name="pdf" accept=".pdf" required />
+              <div class="upload-icon">📄</div>
+              <div class="upload-title">Drop your offer letter here</div>
+              <div class="upload-sub">or click to browse files</div>
+              <span class="upload-btn">Browse PDF</span>
+            </div>
+            <div class="file-selected" id="fileSelected">
+              <span id="fileSelectedName">No file chosen</span>
+            </div>
+          </div>
+
+          <!-- PDF URL input -->
+          <div id="urlContainer" style="display:none; padding:12px; background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:12px; margin-bottom:15px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label for="pdf_url">PDF Offer Letter URL</label>
+              <input type="url" id="pdf_url" name="pdf_url" placeholder="https://example.com/files/offer_letter.pdf" style="width:100%;" />
+              <span class="upload-sub" style="margin-top:6px; display:block; font-size:0.75rem; color:var(--text-sub);">Enter the direct link to the offer letter PDF file.</span>
+            </div>
           </div>
 
           <!-- Optional context -->
@@ -253,6 +270,39 @@ if (uploadZone) {
   });
 }
 
+// ── Source Selection Mode toggler ──────────────────────────────────────────
+let _sourceMode = 'upload';
+
+window.setSourceMode = function(mode) {
+  _sourceMode = mode;
+  const tabUpload = document.getElementById('tabUpload');
+  const tabUrl = document.getElementById('tabUrl');
+  const uploadContainer = document.getElementById('uploadContainer');
+  const urlContainer = document.getElementById('urlContainer');
+  const pdfFile = document.getElementById('pdfFile');
+  const pdfUrl = document.getElementById('pdf_url');
+
+  if (mode === 'upload') {
+    tabUpload.style.color = '#a5b4fc';
+    tabUpload.style.borderBottomColor = '#6366f1';
+    tabUrl.style.color = 'var(--text-sub)';
+    tabUrl.style.borderBottomColor = 'transparent';
+    uploadContainer.style.display = 'block';
+    urlContainer.style.display = 'none';
+    pdfFile.required = true;
+    pdfUrl.required = false;
+  } else {
+    tabUrl.style.color = '#a5b4fc';
+    tabUrl.style.borderBottomColor = '#6366f1';
+    tabUpload.style.color = 'var(--text-sub)';
+    tabUpload.style.borderBottomColor = 'transparent';
+    uploadContainer.style.display = 'none';
+    urlContainer.style.display = 'block';
+    pdfFile.required = false;
+    pdfUrl.required = true;
+  }
+};
+
 // ── Form submit ─────────────────────────────────────────────────────────────
 let _lastOfferData = null;
 
@@ -261,7 +311,8 @@ if (olForm) {
   olForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    if (!pdfFile.files[0]) { alert('Please select a PDF file first.'); return; }
+    if (_sourceMode === 'upload' && !pdfFile.files[0]) { alert('Please select a PDF file first.'); return; }
+    if (_sourceMode === 'url' && !document.getElementById('pdf_url').value.trim()) { alert('Please enter a PDF URL first.'); return; }
 
     const btn     = document.getElementById('scanBtn');
     const btnText = btn ? btn.querySelector('.btn-text') : null;
@@ -276,7 +327,11 @@ if (olForm) {
     document.getElementById('olResultsState').style.display = 'none';
 
     const formData = new FormData();
-    formData.append('pdf', pdfFile.files[0]);
+    if (_sourceMode === 'upload') {
+      formData.append('pdf', pdfFile.files[0]);
+    } else {
+      formData.append('pdf_url', document.getElementById('pdf_url').value.trim());
+    }
     formData.append('company', document.getElementById('ol_company').value.trim());
     formData.append('recruiter_email', document.getElementById('ol_recruiter_email').value.trim());
 

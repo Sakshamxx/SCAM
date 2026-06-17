@@ -68,3 +68,15 @@ INSERT INTO flagged_keywords (keyword, fraud_weight) VALUES
 ('government job guaranteed', 0.88),
 ('100% placement guaranteed', 0.85)
 ON CONFLICT (keyword) DO NOTHING;
+
+-- Table 5: company_reputation
+CREATE TABLE IF NOT EXISTS company_reputation (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    company_name TEXT,
+    domain TEXT,
+    listing_url TEXT,
+    report_reason TEXT,
+    user_id TEXT,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+

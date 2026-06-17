@@ -180,165 +180,6 @@ def log_activity(username, action):
         raise
 
 
-def get_activity_logs(username=None, limit=100):
-    """Fetch activity logs. If username provided, fetch user's logs only."""
-    if not supabase:
-        print("[Warning] Supabase unavailable: Cannot fetch activity logs")
-        return []
-    
-    try:
-        if username:
-            query = (
-                supabase
-                .table("activity_logs")
-                .select("*")
-                .eq("username", username)
-            )
-        else:
-            query = supabase.table("activity_logs").select("*")
-        
-        response = query.order("created_at", desc=True).limit(limit).execute()
-        return response.data
-    except Exception as e:
-        print(f"Error fetching activity logs: {e}")
-        return []
-
-
-# ─────────────────────────────────────────────
-# Scam Reports (Community)
-# ─────────────────────────────────────────────
-
-def save_scam_report(username, company, description, website='', contact_method=''):
-    """Save a community scam report."""
-    if not supabase:
-        print(f"[Warning] Supabase unavailable: Scam report not saved for {username}")
-        return None
-    
-    try:
-        response = supabase.table("scam_reports").insert({
-            "username": username,
-            "company": company,
-            "description": description,
-            "website": website,
-            "contact_method": contact_method
-        }).execute()
-        return response.data
-    except Exception as e:
-        print(f"Error saving scam report: {e}")
-        raise
-
-
-def get_scam_reports(limit=50):
-    """Fetch recent scam reports."""
-    if not supabase:
-        print("[Warning] Supabase unavailable: Cannot fetch scam reports")
-        return []
-    
-    try:
-        response = (
-            supabase
-            .table("scam_reports")
-            .select("*")
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        return response.data
-    except Exception as e:
-        print(f"Error fetching scam reports: {e}")
-        return []
-
-
-def get_recent_scam_reports_public(limit=20):
-    """Fetch recent public scam reports (community feed)."""
-    if not supabase:
-        print("[Warning] Supabase unavailable: Cannot fetch public scam reports")
-        return []
-    
-    try:
-        response = (
-            supabase
-            .table("scam_reports")
-            .select("id, company, description, website, created_at")
-            .order("created_at", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        return response.data
-    except Exception as e:
-        print(f"Error fetching recent scam reports: {e}")
-        return []
-
-
-# ─────────────────────────────────────────────
-# Blacklisted Domains
-# ─────────────────────────────────────────────
-
-def get_blacklisted_domain(domain):
-    """Check if a domain is blacklisted."""
-    if not supabase:
-        print(f"[Warning] Supabase unavailable: Cannot check if {domain} is blacklisted")
-        return None
-    
-    try:
-        response = (
-            supabase
-            .table("blacklisted_domains")
-            .select("*")
-            .ilike("domain", f"%{domain}%")
-            .execute()
-        )
-        return response.data[0] if response.data else None
-    except Exception as e:
-        print(f"Error checking blacklisted domain: {e}")
-        return None
-
-
-# ─────────────────────────────────────────────
-# Platform Statistics
-# ─────────────────────────────────────────────
-
-def get_platform_stats():
-    """Get platform-wide statistics."""
-    if not supabase:
-        print("[Warning] Supabase unavailable: Returning empty stats")
-        return {
-            'total_analyses': 0,
-            'scams_detected': 0,
-            'reports_submitted': 0,
-            'total_users': 0
-        }
-    
-    try:
-        # Total analyses
-        analyses = get_all_analyses(limit=1000)
-        total_analyses = len(analyses)
-        scams_detected = sum(1 for a in analyses if a.get('prediction') == 2)  # prediction=2 is Scam
-        
-        # Total users
-        users = get_all_users()
-        total_users = len(users)
-        
-        # Total reports
-        reports = get_scam_reports(limit=1000)
-        reports_submitted = len(reports)
-        
-        return {
-            'total_analyses': total_analyses,
-            'scams_detected': scams_detected,
-            'reports_submitted': reports_submitted,
-            'total_users': total_users
-        }
-    except Exception as e:
-        print(f"Error fetching platform stats: {e}")
-        return {
-            'total_analyses': 0,
-            'scams_detected': 0,
-            'reports_submitted': 0,
-            'total_user': 0
-        }
-
-
 def get_activity_logs(username=None, limit=None):
     """
     Fetch activity logs.
@@ -675,3 +516,102 @@ def get_common_scam_keywords(limit=10):
     except Exception as e:
         print(f"[warn] get_common_scam_keywords failed: {e}")
         return []
+
+
+def save_company_reputation_report(company_name, domain, listing_url, report_reason, user_id):
+    """
+    Saves a scam listing reputation record to Supabase.
+    Attempts to insert into 'company_reputation' table, falling back to 'scam_reports' if missing.
+    """
+    if not supabase:
+        return None
+    
+    # Try inserting into company_reputation first
+    try:
+        data = {
+            "company_name": company_name or "Unknown",
+            "domain": domain or "",
+            "listing_url": listing_url or "",
+            "report_reason": report_reason or "Automated detection",
+            "user_id": user_id or "system"
+        }
+        resp = supabase.table("company_reputation").insert(data).execute()
+        return resp.data
+    except Exception as e:
+        print(f"[warn] Failed to insert into company_reputation, trying fallback to scam_reports: {e}")
+        # Fallback to scam_reports
+        try:
+            fallback_data = {
+                "username": user_id or "system",
+                "company": company_name or "Unknown",
+                "website": listing_url or domain or "",
+                "description": report_reason or "Automated detection"
+            }
+            resp = supabase.table("scam_reports").insert(fallback_data).execute()
+            return resp.data
+        except Exception as fe:
+            print(f"[error] Fallback to scam_reports also failed: {fe}")
+            return None
+
+
+def get_company_reputation_stats(company_name="", domain="", listing_url=""):
+    """
+    Fetch report counts from 'company_reputation' and 'scam_reports' for a company/domain/url.
+    Returns: (company_count, domain_count, listing_count)
+    """
+    company_count = 0
+    domain_count = 0
+    listing_count = 0
+    
+    if not supabase:
+        return 0, 0, 0
+
+    # Clean inputs
+    company_name = company_name.strip() if company_name else ""
+    domain = domain.strip() if domain else ""
+    listing_url = listing_url.strip() if listing_url else ""
+
+    # Parse domain from URL if URL is given but domain isn't
+    if listing_url and not domain:
+        try:
+            from urllib.parse import urlparse
+            domain = urlparse(listing_url).netloc.replace("www.", "")
+        except Exception:
+            pass
+
+    # Query new company_reputation table
+    try:
+        # 1. Company reports
+        if company_name and company_name.lower() != 'unknown' and company_name != "":
+            res = supabase.table("company_reputation").select("id").ilike("company_name", f"%{company_name}%").execute()
+            company_count += len(res.data) if res.data else 0
+        
+        # 2. Domain reports
+        if domain:
+            res = supabase.table("company_reputation").select("id").ilike("domain", f"%{domain}%").execute()
+            domain_count += len(res.data) if res.data else 0
+            
+        # 3. Listing URL reports
+        if listing_url:
+            res = supabase.table("company_reputation").select("id").ilike("listing_url", f"%{listing_url}%").execute()
+            listing_count += len(res.data) if res.data else 0
+    except Exception as e:
+        print(f"[warn] Failed to query company_reputation stats: {e}")
+
+    # Query existing scam_reports table for legacy/backup reports
+    try:
+        if company_name and company_name.lower() != 'unknown' and company_name != "":
+            res = supabase.table("scam_reports").select("id").ilike("company", f"%{company_name}%").execute()
+            company_count += len(res.data) if res.data else 0
+            
+        if domain:
+            res = supabase.table("scam_reports").select("id").ilike("website", f"%{domain}%").execute()
+            domain_count += len(res.data) if res.data else 0
+            
+        if listing_url:
+            res = supabase.table("scam_reports").select("id").ilike("website", f"%{listing_url}%").execute()
+            listing_count += len(res.data) if res.data else 0
+    except Exception as e:
+        print(f"[warn] Failed to query scam_reports stats: {e}")
+
+    return company_count, domain_count, listing_count

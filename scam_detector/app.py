@@ -205,28 +205,6 @@ Respond ONLY with valid JSON. No extra text."""
     except Exception as e:
         print("Groq explanation error:", e)
         return get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords, job_title, company, details)
-        recommendations = [
-            "Research the company's registration status and search for employee reviews online.",
-            "Ask the recruiter for official corporate identification or an official email confirmation.",
-            "Do not participate in instant hiring decisions without a formal interview process."
-        ]
-    else:
-        explanation = f"The job listing for '{job_title}' at '{company}' displays very few risk indicators, scoring {risk_score}/100. The text pattern and domain align with standard, legitimate hiring practices."
-        recruiter_assessment = "The hiring contact signals appear consistent with standard corporate recruiting practices."
-        safety_advice = "This job appears to be safe, but always verify before sharing personal information."
-        recommendations = [
-            "Review the official company website to understand their business operations.",
-            "Keep all communication within secure and official channels.",
-            "Read the job contract carefully before accepting the offer."
-        ]
-        
-    return {
-        "explanation": explanation,
-        "recommendations": recommendations,
-        "safety_advice": safety_advice,
-        "recruiter_assessment": recruiter_assessment,
-        "is_fallback": True
-    }
 
 
 
@@ -256,15 +234,54 @@ tfidf_vectorizer = None
 nlp_le_location = le_location
 nlp_le_title = le_title
 
+# ── Secondary ML pipeline from job_scam_detection.ipynb ─────────────────────
+# Uses best_model.pkl + tfidf_vectorizer.pkl + scaler.pkl + sentence_transformer.pkl
+_notebook_pipeline = None
+try:
+    import sys
+    from models.inference import JobScamInferencePipeline, DenseTransformer
+    sys.modules['__main__'].DenseTransformer = DenseTransformer
+
+    _best_model   = load_model('best_model.pkl')
+    _tfidf_vec    = load_model('tfidf_vectorizer.pkl')
+    _nb_scaler    = load_model('scaler.pkl')          # shared scaler
+    
+    _sent_trans = None
+    try:
+        _sent_trans = load_model('sentence_transformer.pkl')
+    except Exception as e:
+        print(f"[info] Loading sentence_transformer.pkl failed, trying standard initialization: {e}")
+        
+    if not _sent_trans and _semantic_available:
+        try:
+            _sent_trans = SentenceTransformer('all-MiniLM-L6-v2')
+            print("[info] Loaded standard SentenceTransformer ('all-MiniLM-L6-v2') successfully ✅")
+        except Exception as e:
+            print(f"[warn] Failed to load standard SentenceTransformer: {e}")
+
+    if _best_model and _tfidf_vec and _nb_scaler and _sent_trans:
+        _notebook_pipeline = JobScamInferencePipeline(
+            model=_best_model,
+            tfidf_vec=_tfidf_vec,
+            st_model=_sent_trans,
+            scaler=_nb_scaler,
+        )
+        print('[info] models/inference.py JobScamInferencePipeline loaded ✅')
+    else:
+        print('[warn] One or more notebook model files missing — secondary pipeline disabled')
+except Exception as _nb_err:
+    print(f'[warn] models/inference.py load failed: {_nb_err}')
+
 print("\n" + "=" * 50)
 print("ScamShield v2.0 — Model Status")
 print("=" * 50)
-print(f"NLP Pipeline:     {'✅ Loaded' if nlp_pipeline else '❌ Missing'}")
-print(f"Logistic Model:   {'✅ Loaded' if logistic_model else '❌ Missing'}")
-print(f"Random Forest:    {'✅ Loaded' if random_forest_model else '❌ Missing'}")
-print(f"Scaler:           {'✅ Loaded' if scaler else '❌ Missing'}")
-print(f"LE Location:      {'✅ Loaded' if le_location else '❌ Missing'}")
-print(f"LE Title:         {'✅ Loaded' if le_title else '❌ Missing'}")
+print(f"NLP Pipeline:           {'✅ Loaded' if nlp_pipeline else '❌ Missing'}")
+print(f"Logistic Model:         {'✅ Loaded' if logistic_model else '❌ Missing'}")
+print(f"Random Forest:          {'✅ Loaded' if random_forest_model else '❌ Missing'}")
+print(f"Scaler:                 {'✅ Loaded' if scaler else '❌ Missing'}")
+print(f"LE Location:            {'✅ Loaded' if le_location else '❌ Missing'}")
+print(f"LE Title:               {'✅ Loaded' if le_title else '❌ Missing'}")
+print(f"Notebook Pipeline:      {'✅ Loaded' if _notebook_pipeline else '❌ Missing/Unavailable'}")
 print("=" * 50 + "\n")
 
 
@@ -1149,27 +1166,94 @@ def analyze():
 
         # Combine predictions using Soft Voting (average probabilities)
         combined_proba = (nlp_proba + structured_proba) / 2.0
-        prediction = int(np.argmax(combined_proba))
 
-        # Map prediction to risk level and labels
-        prediction_map = {0: 'Legit', 1: 'Suspicious', 2: 'Scam'}
-        risk_level = prediction_map.get(prediction, 'Legit')
+        # Calculate primary ML score
+        ml_score = float(combined_proba[1] * 50 + combined_proba[2] * 100)
 
-        # Calibrate risk score based on the predicted class range
-        risk_score_raw = combined_proba[1] * 50 + combined_proba[2] * 100
-        if risk_level == 'Legit':
-            risk_score = min(30.0, risk_score_raw)
-            risk_label = '🟢 Likely Genuine'
-        elif risk_level == 'Suspicious':
-            risk_score = max(31.0, min(60.0, risk_score_raw))
-            risk_label = '🟡 Suspicious'
+        # Blend ML score with secondary notebook pipeline signal if available (70/30 blend)
+        if _notebook_pipeline is not None and combined_text.strip():
+            try:
+                nb_result = _notebook_pipeline.predict({
+                    'Job': job_title,
+                    'Company': company,
+                    'Location': location,
+                    'Description': description,
+                    'Skills': skills,
+                    'Experience': str(data.get('experience', '')),
+                    'Education_Required': '',
+                    'Salary_Disclosed': 'Yes' if salary else 'No',
+                    'Description_Length': len(description),
+                    'Keyword_Score': kw_score,
+                })
+                nb_prob = float(nb_result.get('Scam Probability', 0.5))
+                nb_score = nb_prob * 100
+                ml_score = ml_score * 0.70 + nb_score * 0.30
+            except Exception as _nb_err:
+                print(f"[warn] Notebook pipeline prediction failed: {_nb_err}")
+
+        # ── Scraper Analysis (30%) ──
+        scraper_score = 30.0   # default neutral-safe
+        scraper_data = {}
+        if url and _ss_scraper_available:
+            try:
+                scraper_data = ss_analyze_url(url)
+                scraper_score = float(scraper_data.get('final_risk_score', scraper_data.get('risk_score', 50.0)))
+            except Exception as se:
+                print(f"[warn] Scraper analysis failed: {se}")
+
+        # ── Domain Analysis (20%) ──
+        domain_score = check_domain_risk(url) if url else 30.0
+
+        # ── Community Reports (10%) ──
+        from supabase_client import get_company_reputation_stats, save_company_reputation_report
+        url_domain = ""
+        if url:
+            try:
+                url_domain = urllib.parse.urlparse(url).netloc.replace('www.', '')
+            except Exception:
+                pass
+
+        company_count, domain_count, listing_count = get_company_reputation_stats(
+            company_name=company,
+            domain=url_domain,
+            listing_url=url
+        )
+        total_reports = max(company_count, domain_count, listing_count)
+        community_score = min(100.0, total_reports * 20.0)
+
+        # ── Weighted Scam Score ──
+        if url:
+            risk_score = (
+                ml_score        * 0.40 +
+                scraper_score   * 0.30 +
+                domain_score    * 0.20 +
+                community_score * 0.10
+            )
         else:
-            risk_score = max(61.0, risk_score_raw)
-            risk_label = '🔴 Probable Scam'
+            # Fallback re-weighting without URL
+            risk_score = (
+                ml_score        * 0.90 +
+                community_score * 0.10
+            )
 
-        # Skills signal nudge (5% weight, additive, capped so it never flips risk level alone)
+        # Add skills nudge (capped at +5 points, additive, capped at 100 overall)
         skills_nudge = skills_fraud_score * 0.05
-        risk_score   = round(min(100, risk_score + skills_nudge), 1)
+        risk_score = round(min(100.0, max(0.0, risk_score + skills_nudge)), 1)
+
+        # Map to risk level
+        if risk_score <= 30.0:
+            risk_level = 'Legit'
+            risk_label = '🟢 Likely Genuine'
+            prediction = 0
+        elif risk_score <= 60.0:
+            risk_level = 'Suspicious'
+            risk_label = '🟡 Suspicious'
+            prediction = 1
+        else:
+            risk_level = 'Scam'
+            risk_label = '🔴 Probable Scam'
+            prediction = 2
+
         confidence = round(float(combined_proba[prediction] * 100), 1)
 
         # Build details dictionary for front-end compatibility
@@ -1177,8 +1261,8 @@ def analyze():
             'keyword_score': round(kw_score, 1),
             'domain_score': round(domain_score, 1),
             'salary_score': round(salary_score, 1),
-            'report_score': round(report_score, 1),
-            'nlp_model_score': round((nlp_proba[1] * 50 + nlp_proba[2] * 100), 1),
+            'report_score': round(community_score, 1),
+            'nlp_model_score': round(ml_score, 1),
             'matched_keywords': [k for k, v in matched_kw[:8]],
             'skills_fraud_score': round(skills_fraud_score, 1),
             'matched_suspicious_skills': matched_suspicious_skills[:6],
@@ -1196,6 +1280,14 @@ def analyze():
             red_flags.append(f"Scam phrases: {', '.join(details['matched_keywords'][:3])}")
         if matched_suspicious_skills:
             red_flags.append(f"Suspicious skill signals: {', '.join(matched_suspicious_skills[:3])}")
+            
+        # Display reputation counts
+        if company_count > 0:
+            red_flags.append(f"This company has been reported as scam by {company_count} users.")
+        if domain_count > 0:
+            red_flags.append(f"This domain has received {domain_count} scam reports.")
+        elif listing_count > 0:
+            red_flags.append(f"This listing has received {listing_count} scam reports.")
 
         # Safety tips
         tips = []
@@ -1212,6 +1304,20 @@ def analyze():
                 'Verify the job posting on official portals',
                 'Be cautious if asked for personal/financial details',
             ]
+
+        # Save reputation record if marked as scam
+        if risk_level == 'Scam':
+            try:
+                reason = f"Automated unified analysis score: {risk_score}. Flags: {', '.join(red_flags[:3])}"
+                save_company_reputation_report(
+                    company_name=company or 'Unknown',
+                    domain=url_domain,
+                    listing_url=url or '',
+                    report_reason=reason,
+                    user_id=session.get('user', 'system')
+                )
+            except Exception as rep_err:
+                print(f"[warn] Auto-saving reputation report failed: {rep_err}")
 
         # Save analysis to Supabase
         username = session["user"]
@@ -1246,7 +1352,7 @@ def analyze():
                 risk_level=risk_level,
                 is_flagged=(risk_score > 60),
                 skills=skills,
-                domain_name=url.split('/')[2] if url and '/' in url else ''
+                domain_name=url_domain
             )
         except Exception as _jp_err:
             print(f"[warn] job_posts save: {_jp_err}")
@@ -1454,6 +1560,439 @@ def api_stats():
 
 
 
+
+
+
+# ─────────────────────────────────────────────
+# Routes: Unified Analysis API (v2)
+# ─────────────────────────────────────────────
+
+@app.route('/analyze-unified', methods=['POST'])
+def analyze_unified():
+    """
+    Unified analysis pipeline — accepts URL, text, PDF, or image.
+    Merges ML model + scraper + domain + community scores using the formula:
+        Final = 40% ML + 30% Scraper + 20% Domain + 10% Community
+
+    Returns the standardised unified JSON response.
+    """
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized. Please log in.'}), 401
+
+    company_name  = ''
+    job_title_val = ''
+    platform_name = ''
+    description   = ''
+    url           = ''
+    red_flags     = []
+    trust_indicators = []
+
+    # ── 1. Resolve input source ───────────────────────────────────────────────
+    content_type = request.content_type or ''
+
+    if 'multipart/form-data' in content_type:
+        url         = request.form.get('url', '').strip()
+        description = request.form.get('description', '').strip()
+        company_name= request.form.get('company', '').strip()
+        pdf_file    = request.files.get('pdf')
+
+        if pdf_file and pdf_file.filename.lower().endswith('.pdf') and _ss_scraper_available:
+            pdf_bytes = pdf_file.read()
+            extracted = ss_extract_pdf(pdf_bytes)
+            if extracted.get('success') and extracted.get('text'):
+                description = description + '\n' + extracted['text']
+
+    elif request.is_json:
+        data        = request.get_json() or {}
+        url         = data.get('url', '').strip()
+        description = data.get('description', data.get('job_description', '')).strip()
+        company_name= data.get('company', '').strip()
+        job_title_val = data.get('job_title', '').strip()
+
+    if not url and not description:
+        return jsonify({'error': 'Provide at least a URL or job description.'}), 400
+
+    # ── 2. Scraper score (30%) ────────────────────────────────────────────────
+    scraper_score = 50.0   # default neutral
+    scraper_data  = {}
+    if url and _ss_scraper_available:
+        if not url.startswith('http'):
+            url = 'https://' + url
+        try:
+            scraper_data = ss_analyze_url(url)
+            scraper_score = float(
+                scraper_data.get('final_risk_score',
+                scraper_data.get('risk_score', 50))
+            )
+            # Enrich description from scraped page
+            page_title = scraper_data.get('page_title', '')
+            if page_title and not job_title_val:
+                job_title_val = page_title
+            # Extract platform
+            try:
+                from urllib.parse import urlparse as _up
+                domain = _up(url).netloc.lower()
+                trusted_map = {
+                    'linkedin': 'LinkedIn', 'naukri': 'Naukri',
+                    'indeed': 'Indeed', 'internshala': 'Internshala',
+                    'foundit': 'Foundit', 'monster': 'Foundit',
+                    'wellfound': 'Wellfound', 'glassdoor': 'Glassdoor',
+                }
+                for key, name in trusted_map.items():
+                    if key in domain:
+                        platform_name = name
+                        break
+            except Exception:
+                pass
+        except Exception as _sa_err:
+            print(f'[analyze-unified] scraper error: {_sa_err}')
+
+    # If no description yet, try to scrape it
+    if not description and url and _ss_scraper_available:
+        try:
+            scraped = ss_scrape_url(url)
+            if scraped.get('scrape_success'):
+                description = scraped.get('raw_text', scraped.get('body_text', ''))[:3000]
+                if not company_name:
+                    company_name = scraped.get('company', '')
+                if not job_title_val:
+                    job_title_val = scraped.get('title', scraped.get('page_title', ''))
+        except Exception:
+            pass
+
+    combined_text = f"{job_title_val} {description} {company_name}".strip()
+
+    # ── 3. ML score (40%) ─────────────────────────────────────────────────────
+    ml_score = 50.0
+    try:
+        if nlp_pipeline is not None:
+            proba = nlp_pipeline.predict_proba([combined_text])[0]
+            ml_score = float(proba[1] * 50 + proba[2] * 100)
+
+        # Secondary notebook pipeline signal — blend 70/30 if both available
+        if _notebook_pipeline is not None and combined_text.strip():
+            try:
+                nb_result = _notebook_pipeline.predict({
+                    'Job': job_title_val,
+                    'Company': company_name,
+                    'Location': '',
+                    'Description': description,
+                    'Skills': '',
+                    'Experience': '',
+                    'Education_Required': '',
+                    'Salary_Disclosed': 'No',
+                    'Description_Length': len(description),
+                    'Keyword_Score': 0,
+                })
+                nb_prob = float(nb_result.get('Scam Probability', 0.5))
+                nb_score = nb_prob * 100
+                # Blend: 70% primary NLP, 30% notebook pipeline
+                ml_score = ml_score * 0.70 + nb_score * 0.30
+            except Exception as _nb_blend_err:
+                print(f'[analyze-unified] notebook blend error: {_nb_blend_err}')
+    except Exception as _ml_err:
+        print(f'[analyze-unified] ML error: {_ml_err}')
+
+    # ── 4. Domain score (20%) ─────────────────────────────────────────────────
+    domain_score = check_domain_risk(url) if url else 30.0
+
+    # ── 5. Community score (10%) ──────────────────────────────────────────────
+    community_score  = get_user_report_score(company_name, url)
+    community_count  = 0
+    try:
+        if supabase and (company_name or url):
+            q = supabase.table('scam_reports').select('id')
+            if company_name:
+                q = q.ilike('company', f'%{company_name}%')
+            resp = q.execute()
+            community_count = len(resp.data) if resp.data else 0
+    except Exception:
+        pass
+
+    # ── 6. Weighted final score ───────────────────────────────────────────────
+    ml_score       = min(100.0, max(0.0, float(ml_score)))
+    scraper_score  = min(100.0, max(0.0, float(scraper_score)))
+    domain_score   = min(100.0, max(0.0, float(domain_score)))
+    community_score= min(100.0, max(0.0, float(community_score)))
+
+    final_score = round(
+        ml_score       * 0.40 +
+        scraper_score  * 0.30 +
+        domain_score   * 0.20 +
+        community_score * 0.10,
+        1
+    )
+
+    if final_score <= 30:
+        risk_level  = 'Safe'
+        risk_label  = '🟢 Likely Genuine'
+    elif final_score <= 60:
+        risk_level  = 'Suspicious'
+        risk_label  = '🟡 Suspicious'
+    else:
+        risk_level  = 'Scam'
+        risk_label  = '🔴 Probable Scam'
+
+    # Confidence is highest when score is near 0 or 100
+    confidence = round(abs(final_score - 50) * 2, 1)   # 0-100
+
+    # ── 7. Red flags ──────────────────────────────────────────────────────────
+    kw_score, matched_kw = keyword_fraud_score(combined_text)
+    if kw_score > 50:
+        red_flags.append('High-risk fraud keywords detected')
+    if domain_score > 60:
+        red_flags.append('Suspicious domain/URL pattern')
+    if community_count > 0:
+        red_flags.append(f'Reported by {community_count} user(s) in community')
+    for reason in scraper_data.get('risk_reasons', scraper_data.get('fraud_reasons', [])):
+        if reason not in red_flags:
+            red_flags.append(reason)
+    matched_kw_list = [k for k, _ in matched_kw[:5]]
+    if matched_kw_list:
+        red_flags.append(f"Scam phrases: {', '.join(matched_kw_list[:3])}")
+
+    # ── 8. Trust indicators ───────────────────────────────────────────────────
+    if url and url.startswith('https://'):
+        trust_indicators.append('HTTPS enabled')
+    if not scraper_data.get('suspicious_tld'):
+        trust_indicators.append('Standard TLD')
+    if domain_score <= 30:
+        trust_indicators.append('Domain appears trustworthy')
+    if community_count == 0:
+        trust_indicators.append('No community scam reports found')
+
+    # ── 9. Recommendation ─────────────────────────────────────────────────────
+    if risk_level == 'Scam':
+        recommendation = 'Do NOT apply. This listing shows strong scam indicators. Never pay any fees.'
+    elif risk_level == 'Suspicious':
+        recommendation = 'Proceed with caution. Verify the company on official portals before applying.'
+    else:
+        recommendation = 'This listing appears safe. Always read the offer carefully before sharing personal data.'
+
+    # ── 10. Log activity ──────────────────────────────────────────────────────
+    try:
+        log_activity(session['user'], f'Unified Analysis — {risk_level}')
+    except Exception:
+        pass
+
+    return jsonify({
+        'company_name':      company_name or 'Unknown',
+        'job_title':         job_title_val or 'Unknown',
+        'platform':          platform_name or 'Unknown',
+        'ml_score':          round(ml_score, 1),
+        'scraper_score':     round(scraper_score, 1),
+        'domain_score':      round(domain_score, 1),
+        'community_score':   round(community_score, 1),
+        'final_score':       final_score,
+        'risk_level':        risk_level,
+        'risk_label':        risk_label,
+        'confidence':        confidence,
+        'red_flags':         red_flags,
+        'trust_indicators':  trust_indicators,
+        'community_reports': community_count,
+        'recommendation':    recommendation,
+        'matched_keywords':  matched_kw_list,
+        'scraper_details':   {
+            'domain_age_days': scraper_data.get('domain_age_days'),
+            'https_enabled':   scraper_data.get('https_enabled'),
+            'suspicious_tld':  scraper_data.get('suspicious_tld'),
+        },
+        'models_used': {
+            'nlp_pipeline':       nlp_pipeline is not None,
+            'notebook_pipeline':  _notebook_pipeline is not None,
+            'scraper':            _ss_scraper_available,
+        },
+    })
+
+
+@app.route('/offer-letter/analyze-image', methods=['POST'])
+def offer_letter_analyze_image():
+    """
+    Accept an image upload (JPEG, PNG, WebP) and run the offer-letter
+    fraud analysis pipeline on the OCR-extracted text.
+    """
+    if 'user' not in session:
+        return jsonify({'error': 'Unauthorized. Please log in.'}), 401
+
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image file uploaded.'}), 400
+
+    img_file = request.files['image']
+    allowed_exts = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif')
+    if not any(img_file.filename.lower().endswith(ext) for ext in allowed_exts):
+        return jsonify({'error': 'Please upload a JPEG, PNG, or WebP image.'}), 400
+
+    img_bytes = img_file.read()
+    if len(img_bytes) > 10 * 1024 * 1024:
+        return jsonify({'error': 'File too large. Maximum size is 10 MB.'}), 400
+
+    company = request.form.get('company', '').strip()
+
+    # ── Extract text via OCR ────────────────────────────────────────────────
+    extracted_text = ''
+    ocr_method     = 'unavailable'
+
+    if _ss_scraper_available:
+        try:
+            ocr_result = ss_extract_image(img_bytes)
+            if ocr_result.get('success') and ocr_result.get('text'):
+                extracted_text = ocr_result['text']
+                ocr_method     = ocr_result.get('method', 'ocr_tesseract')
+        except Exception as _ocr_err:
+            print(f'[image-analyze] OCR error: {_ocr_err}')
+
+    if not extracted_text:
+        # Direct pytesseract fallback
+        try:
+            import io as _io
+            from PIL import Image as _PIL
+            import pytesseract
+            img_obj = _PIL.open(_io.BytesIO(img_bytes)).convert('RGB')
+            extracted_text = pytesseract.image_to_string(img_obj, lang='eng', config='--psm 6').strip()
+            ocr_method = 'pytesseract_direct'
+        except Exception as _pyt_err:
+            print(f'[image-analyze] pytesseract fallback error: {_pyt_err}')
+
+    if not extracted_text or len(extracted_text.strip()) < 30:
+        return jsonify({'error': 'No readable text found in the image. The image may be too blurry or low-resolution.'}), 422
+
+    # ── Reuse offer-letter analysis logic ───────────────────────────────────
+    text_lower = extracted_text.lower()
+
+    OFFER_FRAUD_SIGNALS = {
+        'registration_fee': {'name': 'Registration Fee Mention', 'keywords': ['registration fee', 'joining fee', 'registration charges', 'onboarding fee'], 'weight': 35},
+        'security_deposit': {'name': 'Security Deposit Request',  'keywords': ['security deposit', 'refundable deposit', 'security amount'], 'weight': 30},
+        'training_fee':     {'name': 'Training / Kit Fee',         'keywords': ['training fee', 'training kit', 'material fee', 'training cost'], 'weight': 25},
+        'personal_email':   {'name': 'Personal Email Usage',       'keywords': ['@gmail.com', '@yahoo.com', '@hotmail.com', '@outlook.com'], 'weight': 15},
+        'unrealistic_salary': {'name': 'Unrealistic Salary Claim', 'keywords': ['earn from home', 'daily payment', 'guaranteed income', 'unlimited earning'], 'weight': 20},
+    }
+
+    risk_factors   = []
+    total_weight   = 0
+    detected_count = 0
+
+    for key, signal in OFFER_FRAUD_SIGNALS.items():
+        found_kw = [kw for kw in signal['keywords'] if kw in text_lower]
+        detected  = len(found_kw) > 0
+        if detected:
+            total_weight   += signal['weight']
+            detected_count += 1
+        risk_factors.append({
+            'key': key, 'name': signal['name'], 'detected': detected,
+            'detail': f"Found: {', '.join(found_kw[:3])}" if detected else 'Not detected',
+            'weight': signal['weight'],
+        })
+
+    kw_score, matched_kw_pairs = keyword_fraud_score(extracted_text)
+    matched_keywords = [k for k, v in matched_kw_pairs[:6]]
+
+    max_signal_weight = sum(s['weight'] for s in OFFER_FRAUD_SIGNALS.values())
+    signal_risk = min(100, (total_weight / max_signal_weight) * 100) if max_signal_weight > 0 else 0
+    risk_score  = round(min(100, signal_risk * 0.70 + kw_score * 0.30), 1)
+
+    if risk_score <= 25:   risk_level, risk_label, risk_color = 'LOW',      '🟢 Appears Genuine',          'green'
+    elif risk_score <= 55: risk_level, risk_label, risk_color = 'MEDIUM',   '🟡 Review Carefully',          'yellow'
+    elif risk_score <= 80: risk_level, risk_label, risk_color = 'HIGH',     '🔴 Likely Fraudulent',         'red'
+    else:                  risk_level, risk_label, risk_color = 'CRITICAL',  '🚨 Almost Certainly a Scam',  'critical'
+
+    red_flags = [f['name'] for f in risk_factors if f['detected']]
+
+    groq_data = None
+    try:
+        groq_data = get_groq_explanation(
+            risk_score=risk_score, risk_level=risk_level, risk_label=risk_label,
+            red_flags=red_flags, matched_keywords=matched_keywords,
+            job_title='Image / Poster', company=company or 'Unknown',
+            details={'keyword_score': round(kw_score, 1), 'domain_score': 0, 'salary_score': 0, 'nlp_model_score': 0}
+        )
+    except Exception:
+        pass
+
+    try:
+        log_activity(session['user'], f'Image Scanned — {risk_level}')
+    except Exception:
+        pass
+
+    return jsonify({
+        'risk_score':       risk_score,
+        'risk_level':       risk_level,
+        'risk_label':       risk_label,
+        'risk_color':       risk_color,
+        'risk_factors':     risk_factors,
+        'ai_explanation':   (groq_data or {}).get('explanation', ''),
+        'recommendations':  (groq_data or {}).get('recommendations', [
+            'Never pay any fee to secure a job offer.',
+            'Verify the company on LinkedIn and the official MCA portal.',
+        ]),
+        'matched_keywords': matched_keywords,
+        'company':          company,
+        'detected_signals': detected_count,
+        'ocr_method':       ocr_method,
+        'extracted_text_preview': extracted_text[:300],
+    })
+
+
+@app.route('/api/community-reports')
+def api_community_reports():
+    """
+    Get aggregated community scam reports for a company, URL or domain.
+    Used by the dashboard and unified analysis to display community warnings.
+    """
+    company = request.args.get('company', '').strip()
+    url     = request.args.get('url', '').strip()
+    domain  = request.args.get('domain', '').strip()
+
+    if not company and not url and not domain:
+        return jsonify({'error': 'Provide company, url, or domain parameter.'}), 400
+
+    # Resolve domain from url
+    if url and not domain:
+        try:
+            domain = urllib.parse.urlparse(url).netloc.replace('www.', '')
+        except Exception:
+            pass
+
+    company_count = 0
+    domain_count  = 0
+    listing_count = 0
+    warnings      = []
+
+    try:
+        if supabase:
+            if company:
+                resp = supabase.table('scam_reports').select('id, description, created_at') \
+                    .ilike('company', f'%{company}%').execute()
+                company_count = len(resp.data) if resp.data else 0
+                if company_count > 0:
+                    warnings.append(f'This company has been reported as scam by {company_count} user(s).')
+
+            if domain:
+                resp = supabase.table('scam_reports').select('id') \
+                    .ilike('website', f'%{domain}%').execute()
+                domain_count = len(resp.data) if resp.data else 0
+                if domain_count > 0:
+                    warnings.append(f'This domain has received {domain_count} scam report(s).')
+
+            if url:
+                resp = supabase.table('scam_reports').select('id') \
+                    .ilike('website', f'%{url}%').execute()
+                listing_count = len(resp.data) if resp.data else 0
+                if listing_count > 0:
+                    warnings.append(f'This listing URL has received {listing_count} scam report(s).')
+    except Exception as _cr_err:
+        print(f'[community-reports] error: {_cr_err}')
+
+    total = max(company_count, domain_count, listing_count)
+    community_score = min(100, total * 20)
+
+    return jsonify({
+        'company_count':   company_count,
+        'domain_count':    domain_count,
+        'listing_count':   listing_count,
+        'total_reports':   total,
+        'community_score': community_score,
+        'warnings':        warnings,
+    })
 
 
 TRUSTED_PLATFORMS = [
@@ -2051,27 +2590,46 @@ def offer_letter_page():
 @app.route('/offer-letter/analyze', methods=['POST'])
 def offer_letter_analyze():
     """
-    Accept a PDF upload, extract text with multi-layer PDF extractor
+    Accept a PDF upload or PDF URL, extract text with multi-layer PDF extractor
     (pdfplumber → PyMuPDF → OCR Tesseract fallback),
     run ML pipeline + Groq explanation, return JSON results.
     """
     if 'user' not in session:
         return jsonify({'error': 'Unauthorized. Please log in.'}), 401
 
-    if 'pdf' not in request.files:
-        return jsonify({'error': 'No PDF file uploaded.'}), 400
-
-    pdf_file = request.files['pdf']
-    if not pdf_file.filename.lower().endswith('.pdf'):
-        return jsonify({'error': 'Please upload a PDF file.'}), 400
-
-    # Read file bytes and enforce 5 MB limit
-    pdf_bytes = pdf_file.read()
-    if len(pdf_bytes) > 5 * 1024 * 1024:
-        return jsonify({'error': 'File too large. Maximum size is 5 MB.'}), 400
-
     company          = request.form.get('company', '').strip()
     recruiter_email  = request.form.get('recruiter_email', '').strip()
+    pdf_url          = request.form.get('pdf_url', '').strip()
+
+    if request.is_json:
+        data = request.get_json() or {}
+        company = data.get('company', '').strip()
+        recruiter_email = data.get('recruiter_email', '').strip()
+        pdf_url = data.get('pdf_url', '').strip()
+
+    # ── Resolve PDF source (Upload or URL) ──────────────────────────────────
+    pdf_bytes = None
+    if pdf_url:
+        if not pdf_url.startswith('http'):
+            pdf_url = 'https://' + pdf_url
+        try:
+            import requests as _req
+            resp = _req.get(pdf_url, timeout=15)
+            resp.raise_for_status()
+            pdf_bytes = resp.content
+            if len(pdf_bytes) > 10 * 1024 * 1024:
+                return jsonify({'error': 'PDF file at URL is too large. Maximum size is 10 MB.'}), 400
+        except Exception as e:
+            return jsonify({'error': f'Failed to download PDF from URL: {str(e)}'}), 400
+    else:
+        if 'pdf' not in request.files:
+            return jsonify({'error': 'Provide a PDF file or a PDF URL.'}), 400
+        pdf_file = request.files['pdf']
+        if not pdf_file.filename.lower().endswith('.pdf'):
+            return jsonify({'error': 'Please upload a PDF file.'}), 400
+        pdf_bytes = pdf_file.read()
+        if len(pdf_bytes) > 10 * 1024 * 1024:
+            return jsonify({'error': 'File too large. Maximum size is 10 MB.'}), 400
 
     # ── 1. Extract text using new multi-layer PDF extractor ──────────────────
     extracted_text = ''
@@ -2086,8 +2644,8 @@ def offer_letter_analyze():
         print('PDF extraction error:', e)
         return jsonify({'error': 'Could not extract text from PDF. Please ensure it is a valid PDF file.'}), 422
 
-    if not extracted_text or len(extracted_text.strip()) < 50:
-        return jsonify({'error': 'No readable text found in the PDF. The document may be corrupted or empty.'}), 422
+    if not extracted_text or len(extracted_text.strip()) < 30:
+        return jsonify({'error': 'No readable text found in the PDF. The document may be empty or require manual check.'}), 422
 
     text_lower = extracted_text.lower()
 
@@ -2095,35 +2653,54 @@ def offer_letter_analyze():
     OFFER_FRAUD_SIGNALS = {
         'registration_fee': {
             'name': 'Registration Fee Mention',
-            'keywords': ['registration fee', 'joining fee', 'registration charges', 'onboarding fee', 'enrolment fee'],
+            'keywords': ['registration fee', 'joining fee', 'registration charges', 'onboarding fee', 'enrolment fee', 'activation fee'],
             'weight': 35,
         },
         'security_deposit': {
             'name': 'Security Deposit Request',
-            'keywords': ['security deposit', 'refundable deposit', 'security amount', 'caution deposit'],
+            'keywords': ['security deposit', 'refundable deposit', 'security amount', 'caution deposit', 'refundable amount'],
             'weight': 30,
         },
         'training_fee': {
             'name': 'Training / Kit Fee',
-            'keywords': ['training fee', 'training kit', 'kit charge', 'material fee', 'training cost'],
+            'keywords': ['training fee', 'training kit', 'kit charge', 'material fee', 'training cost', 'laptop security'],
             'weight': 25,
         },
         'personal_email': {
-            'name': 'Personal Email Usage',
-            'keywords': ['@gmail.com', '@yahoo.com', '@hotmail.com', '@outlook.com', '@rediffmail.com'],
-            'weight': 15,
+            'name': 'Personal / Free Email Usage',
+            'keywords': ['@gmail.com', '@yahoo.com', '@hotmail.com', '@outlook.com', '@rediffmail.com', '@live.com', '@yandex.com'],
+            'weight': 20,
         },
         'unrealistic_salary': {
             'name': 'Unrealistic Salary Claim',
             'keywords': ['earn from home', 'daily payment', 'weekly payment guaranteed', 'guaranteed income',
-                         'earn per day', 'unlimited earning'],
+                         'earn per day', 'unlimited earning', 'no target', 'hours work'],
             'weight': 20,
         },
+        'payment_request': {
+            'name': 'Payment / Bank Details Requested',
+            'keywords': ['bank details', 'upi id', 'gpay', 'paytm', 'phonepe', 'bank account', 'account number',
+                         'transfer the amount', 'deposit the fee', 'pay the security', 'scan the qr', 'send money',
+                         'payment link', 'qr code'],
+            'weight': 30,
+        },
+        'hr_validation': {
+            'name': 'Suspicious HR Contact / Channels',
+            'keywords': ['whatsapp hr', 'whatsapp number', 'telegram hr', 'contact hr on', 'reach us on whatsapp',
+                         'hr executive whatsapp', 'chat with hr', 'hr on telegram', 'telegram channel', 'telegram group'],
+            'weight': 25,
+        },
+        'joining_letter': {
+            'name': 'Suspicious Selection / Urgent Letter',
+            'keywords': ['urgent joining', 'instant selection', 'no interview', 'direct selection', 'pay and join',
+                         'selection within 24 hours', 'immediate start', 'hurry up', 'limited seats'],
+            'weight': 20,
+        }
     }
 
     # If recruiter_email provided, check it directly
     if recruiter_email:
-        personal_domains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'rediffmail.com']
+        personal_domains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'rediffmail.com', 'live.com', 'yandex.com']
         email_domain = recruiter_email.split('@')[-1].lower() if '@' in recruiter_email else ''
         if email_domain in personal_domains:
             OFFER_FRAUD_SIGNALS['personal_email']['keywords'].append(recruiter_email.lower())
@@ -2146,12 +2723,58 @@ def offer_letter_analyze():
             'weight':   signal['weight'],
         })
 
-    # ── 3. Combine with ML keyword score on extracted text ───────────────────
+    # ── 3. Company & Domain Validation ───────────────────────────────────────
+    company_reputation_score = 0.0
+    email_domain_mismatch = False
+    
+    if company:
+        try:
+            from supabase_client import get_company_reputation_stats
+            company_reports, _, _ = get_company_reputation_stats(company_name=company)
+            if company_reports > 0:
+                company_reputation_score = min(100.0, company_reports * 25.0)
+                risk_factors.append({
+                    'key':      'company_reputation',
+                    'name':     'Known Community Scam Reports',
+                    'detected': True,
+                    'detail':   f"Company has received {company_reports} community scam reports.",
+                    'weight':   25,
+                })
+                total_weight += 25
+                detected_count += 1
+        except Exception:
+            pass
+
+    # Domain mismatch check (e.g. company name is Google but email domain is @wipro.com)
+    if recruiter_email and company:
+        personal_domains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'rediffmail.com', 'live.com']
+        email_domain = recruiter_email.split('@')[-1].lower() if '@' in recruiter_email else ''
+        if email_domain and email_domain not in personal_domains:
+            clean_company = re.sub(r'[^a-zA-Z0-9]', '', company).lower()
+            clean_domain = email_domain.split('.')[0]
+            if clean_domain not in clean_company and clean_company not in clean_domain:
+                email_domain_mismatch = True
+                risk_factors.append({
+                    'key':      'domain_mismatch',
+                    'name':     'Company - Email Domain Mismatch',
+                    'detected': True,
+                    'detail':   f"Recruiter email domain '{email_domain}' does not match company name '{company}'.",
+                    'weight':   20,
+                })
+                total_weight += 20
+                detected_count += 1
+
+    # ── 4. Combine with ML keyword score on extracted text ───────────────────
     kw_score, matched_kw_pairs = keyword_fraud_score(extracted_text)
     matched_keywords = [k for k, v in matched_kw_pairs[:6]]
 
-    # Weighted risk: offer signals (70%) + keyword ML (30%)
+    # Weighted risk calculation
     max_signal_weight = sum(s['weight'] for s in OFFER_FRAUD_SIGNALS.values())
+    if company_reputation_score > 0:
+        max_signal_weight += 25
+    if email_domain_mismatch:
+        max_signal_weight += 20
+
     signal_risk = min(100, (total_weight / max_signal_weight) * 100) if max_signal_weight > 0 else 0
     risk_score  = round(min(100, signal_risk * 0.70 + kw_score * 0.30), 1)
 
@@ -2166,7 +2789,7 @@ def offer_letter_analyze():
 
     red_flags = [f['name'] for f in risk_factors if f['detected']]
 
-    # ── 4. Groq explanation ──────────────────────────────────────────────────
+    # ── 5. Groq explanation ──────────────────────────────────────────────────
     groq_data = None
     try:
         groq_data = get_groq_explanation(
@@ -2194,7 +2817,7 @@ def offer_letter_analyze():
         'Contact the company directly using contact info from their official website.',
     ])
 
-    # ── 5. Log activity ──────────────────────────────────────────────────────
+    # ── 6. Log activity ──────────────────────────────────────────────────────
     try:
         log_activity(session['user'], f'Offer Letter Scanned — {risk_level}')
     except Exception as le:
