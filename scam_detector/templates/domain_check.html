@@ -190,7 +190,6 @@
         <a href="/" class="footer-link">Home</a>
         <a href="/domain-check" class="footer-link">Domain Check</a>
         <a href="/verify-company" class="footer-link">Verify Company</a>
-        <a href="/threat-intel" class="footer-link">Threat Intel</a>
       </div>
       <div class="footer-note">ScamShield AI · Domain Intelligence · Graphura India</div>
     </div>
@@ -276,6 +275,7 @@ document.getElementById('domainInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') analyzeDomain();
 });
 </script>
+<script src="{{ url_for('static', filename='js/clickspark.js') }}"></script>
 
 </body>
 </html>

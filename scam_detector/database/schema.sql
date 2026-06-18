@@ -80,3 +80,22 @@ CREATE TABLE IF NOT EXISTS company_reputation (
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Table 6: ai_chat_sessions
+CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT,
+    title TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Table 7: ai_chat_messages
+CREATE TABLE IF NOT EXISTS ai_chat_messages (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    session_id UUID REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+    role TEXT,
+    content TEXT,
+    documents JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+

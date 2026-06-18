@@ -8,10 +8,352 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Auth Page Overrides ── */
+    .auth-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px 24px;
+      background: #0f172a;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Animated gradient orbs */
+    .auth-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .auth-orb-1 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, #6366f1 0%, transparent 70%);
+      top: -100px; left: -100px;
+      animation: orbFloat1 12s ease-in-out infinite;
+    }
+    .auth-orb-2 {
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
+      bottom: -80px; right: -80px;
+      animation: orbFloat2 14s ease-in-out infinite;
+    }
+    .auth-orb-3 {
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, #10b981 0%, transparent 70%);
+      top: 40%; right: 15%;
+      animation: orbFloat3 10s ease-in-out infinite;
+    }
+
+    @keyframes orbFloat1 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(40px, 60px) scale(1.1); }
+      66% { transform: translate(-20px, 30px) scale(0.95); }
+    }
+    @keyframes orbFloat2 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(-30px, -50px) scale(1.05); }
+      66% { transform: translate(20px, -20px) scale(0.9); }
+    }
+    @keyframes orbFloat3 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(-40px, 30px) scale(1.15); }
+    }
+
+    /* Card */
+    .auth-card {
+      width: 100%;
+      max-width: 440px;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(165, 180, 252, 0.15);
+      border-radius: 24px;
+      padding: 48px 40px;
+      box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.25),
+        0 0 80px rgba(99, 102, 241, 0.1),
+        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      text-align: left;
+      position: relative;
+      z-index: 10;
+      animation: cardSlideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.3s ease;
+    }
+
+    .auth-card:hover {
+      border-color: rgba(165, 180, 252, 0.25);
+      box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.35),
+        0 0 100px rgba(99, 102, 241, 0.15),
+        inset 0 1px 1px rgba(255, 255, 255, 0.15);
+    }
+
+    @keyframes cardSlideUp {
+      from { opacity: 0; transform: translateY(40px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Logo */
+    .auth-logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-decoration: none;
+      margin-bottom: 32px;
+    }
+    .auth-logo .graphura-logo {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+    }
+    .auth-logo .logo-text {
+      font-size: 1.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 50%, #8b5cf6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Title */
+    .auth-title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 6px;
+      text-align: center;
+      letter-spacing: -0.02em;
+    }
+    .auth-subtitle {
+      font-size: 0.88rem;
+      color: #94a3b8;
+      margin-bottom: 32px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* Form */
+    .auth-form { display: flex; flex-direction: column; gap: 22px; }
+
+    .auth-form .form-group label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #c8d1e0;
+      margin-bottom: 8px;
+      letter-spacing: 0.02em;
+    }
+
+    .auth-form .form-group input {
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(165, 180, 252, 0.15);
+      border-radius: 12px;
+      color: #e2e8f0;
+      font-size: 0.92rem;
+      font-family: inherit;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    .auth-form .form-group input:hover {
+      border-color: rgba(165, 180, 252, 0.25);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .auth-form .form-group input:focus {
+      border-color: rgba(99, 102, 241, 0.5);
+      background: rgba(99, 102, 241, 0.08);
+      box-shadow:
+        0 0 0 3px rgba(99, 102, 241, 0.1),
+        0 0 20px rgba(99, 102, 241, 0.1);
+    }
+
+    .auth-form .form-group input::placeholder {
+      color: #64748b;
+    }
+
+    /* Input container for password toggle */
+    .input-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-container input { padding-right: 48px; }
+
+    .password-toggle {
+      position: absolute;
+      right: 14px;
+      background: none;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      transition: color 0.2s, transform 0.2s;
+      z-index: 2;
+    }
+    .password-toggle:hover { color: #a5b4fc; transform: scale(1.1); }
+
+    /* Remember me row */
+    .auth-remember {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 2px 0 8px;
+    }
+    .auth-remember input[type="checkbox"] {
+      width: 16px !important; height: 16px; margin: 0; cursor: pointer;
+      accent-color: #6366f1;
+    }
+    .auth-remember label {
+      margin: 0 !important;
+      font-size: 0.84rem !important;
+      color: #94a3b8 !important;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 400 !important;
+    }
+
+    /* Submit button */
+    .auth-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      cursor: pointer;
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+      color: #fff;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: inherit;
+      transition: all 0.3s ease;
+      box-shadow:
+        0 4px 20px rgba(99, 102, 241, 0.4),
+        0 0 40px rgba(99, 102, 241, 0.12);
+      margin-top: 8px;
+      letter-spacing: 0.02em;
+      position: relative;
+      overflow: hidden;
+    }
+    .auth-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.2) 50%, transparent 70%);
+      transform: translateX(-100%);
+      transition: transform 0.6s ease;
+    }
+    .auth-btn:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 8px 32px rgba(99, 102, 241, 0.5),
+        0 0 60px rgba(99, 102, 241, 0.2);
+    }
+    .auth-btn:hover::before { transform: translateX(100%); }
+    .auth-btn:active { 
+      transform: translateY(0);
+      box-shadow:
+        0 2px 12px rgba(99, 102, 241, 0.3),
+        0 0 30px rgba(99, 102, 241, 0.1);
+    }
+
+    /* Footer */
+    .auth-footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 0.87rem;
+      color: #64748b;
+    }
+    .auth-footer a {
+      color: #a5b4fc;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+    .auth-footer a:hover { color: #c4b5fd; }
+
+    /* Error */
+    .auth-error {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: shakeError 0.4s ease;
+    }
+    .auth-error::before { content: '⚠️'; }
+
+    @keyframes shakeError {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+
+    /* Password strength bar */
+    .pwd-strength-track {
+      height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 4px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .pwd-strength-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 4px;
+      transition: width 0.3s ease, background 0.3s ease;
+    }
+    .pwd-strength-label {
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-top: 4px;
+      min-height: 16px;
+      transition: color 0.3s;
+    }
+
+    /* Grid animation */
+    .hero-bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .auth-card { padding: 32px 24px; border-radius: 20px; }
+      .auth-title { font-size: 1.5rem; }
+    }
+  </style>
 </head>
 <body class="auth-page">
 
   <div class="hero-bg-grid"></div>
+  <div class="auth-orb auth-orb-1"></div>
+  <div class="auth-orb auth-orb-2"></div>
+  <div class="auth-orb auth-orb-3"></div>
 
   <div class="auth-card">
     <a href="/" class="auth-logo">
@@ -24,7 +366,7 @@
     </a>
 
     <h2 class="auth-title">Welcome Back</h2>
-    <p class="auth-subtitle">Verify job scams with Graphura's AI engine</p>
+    <p class="auth-subtitle">Sign in to access your scam detection dashboard</p>
 
     {% if error %}
       <div class="auth-error">
@@ -40,6 +382,7 @@
           id="username"
           name="username"
           placeholder="Enter your username"
+          autocomplete="username"
           required
         >
       </div>
@@ -52,17 +395,18 @@
             id="password"
             name="password"
             placeholder="Enter your password"
+            autocomplete="current-password"
             required
           >
-          <button type="button" class="password-toggle" id="passwordToggle" aria-label="Toggle Password Visibility">
+          <button type="button" class="password-toggle pwd-toggle" data-target="password" id="passwordToggle" aria-label="Toggle Password Visibility">
             👁️
           </button>
         </div>
       </div>
 
-      <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 8px; margin-bottom: 20px;">
-        <input type="checkbox" id="remember" name="remember" style="width: auto; margin: 0; cursor: pointer;">
-        <label for="remember" style="margin: 0; font-size: 0.85rem; color: var(--text-sub); cursor: pointer; user-select: none;">Remember Me</label>
+      <div class="auth-remember">
+        <input type="checkbox" id="remember" name="remember">
+        <label for="remember">Remember me</label>
       </div>
 
       <button type="submit" class="auth-btn">Log In</button>
@@ -73,17 +417,7 @@
     </div>
   </div>
 
-  <script>
-    const passwordInput = document.getElementById('password');
-    const passwordToggle = document.getElementById('passwordToggle');
-
-    if (passwordInput && passwordToggle) {
-      passwordToggle.addEventListener('click', () => {
-        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        passwordInput.setAttribute('type', type);
-        passwordToggle.textContent = type === 'password' ? '👁️' : '🙈';
-      });
-    }
-  </script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/premium-saas-bg.js') }}"></script>
 </body>
 </html>

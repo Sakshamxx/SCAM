@@ -20,7 +20,9 @@ from supabase_client import (
     supabase, save_analysis, get_history, log_activity, get_activity_logs,
     get_all_users, get_all_analyses, get_user_analyses,
     get_blacklisted_domain, save_scam_report, get_scam_reports,
-    get_platform_stats, get_recent_scam_reports_public
+    get_platform_stats, get_recent_scam_reports_public,
+    create_chat_session, get_chat_sessions, delete_chat_session,
+    save_chat_message, get_chat_messages
 )
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -30,11 +32,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
-try:
-    from groq import Groq as GroqClient
-    _groq_available = True
-except ImportError:
-    _groq_available = False
 
 # ── New extraction utilities ─────────────────────────────────────────────────
 try:
@@ -96,116 +93,6 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 BASE_DIR = Path(__file__).parent
 MODEL_DIR = BASE_DIR / 'models'
 
-# ─────────────────────────────────────────────
-# Groq AI Explanation Layer
-# ─────────────────────────────────────────────
-_groq_client = None
-
-def _get_groq_client():
-    """Lazy-load Groq client; return None if unavailable."""
-    global _groq_client
-    if not _groq_available:
-        return None
-    if _groq_client is None:
-        api_key = os.getenv("GROQ_API_KEY", "").strip()
-        if api_key:
-            try:
-                _groq_client = GroqClient(api_key=api_key)
-            except Exception as e:
-                print("Groq client init error:", e)
-    return _groq_client
-
-
-def get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords,
-                                  job_title='', company='', details=None):
-    """Generate fallback explanation if Groq unavailable."""
-    if risk_level == 'Scam':
-        explanation = f"This job listing for '{job_title}' at '{company}' exhibits high-risk indicators, with a risk score of {risk_score}/100. Specific anomalies such as flagged keywords ({', '.join(matched_keywords[:3]) if matched_keywords else 'none detected'}) warrant extreme caution."
-        recruiter_assessment = "The recruiter credentials and contact methods match patterns commonly associated with employment scams."
-        safety_advice = "DO NOT pay any fees or share sensitive personal documents (PAN/Aadhaar) with this recruiter."
-        recommendations = [
-            "Never pay any registration fee, training fee, or document charge to secure a job.",
-            "Verify the recruiter's official company email rather than generic Gmail/WhatsApp.",
-            "Cross-verify the job listing on the company's official careers portal.",
-            "Refuse any requests for upfront bank account details or identity documents."
-        ]
-    elif risk_level == 'Suspicious':
-        explanation = f"The job listing for '{job_title}' at '{company}' has a moderate risk score of {risk_score}/100. While not definitively fraudulent, it contains suspicious phrases or contact channels that require validation."
-        recruiter_assessment = "The recruiter signals are mixed, showing unverified email domains or non-standard application procedures."
-        safety_advice = "Verify the job posting and company credentials before continuing with the application."
-        recommendations = [
-            "Research the company's registration status and search for employee reviews online.",
-            "Ask the recruiter for official corporate identification or an official email confirmation.",
-            "Do not participate in instant hiring decisions without a formal interview process."
-        ]
-    else:
-        explanation = f"The job listing for '{job_title}' at '{company}' displays very few risk indicators, scoring {risk_score}/100. The text pattern aligns with standard, legitimate hiring practices."
-        recruiter_assessment = "The hiring contact signals appear consistent with standard corporate recruiting practices."
-        safety_advice = "This job appears to be safe, but always verify before sharing personal information."
-        recommendations = [
-            "Review the official company website to understand their business operations.",
-            "Keep all communication within secure and official channels.",
-            "Read the job contract carefully before accepting the offer."
-        ]
-        
-    return {
-        "explanation": explanation,
-        "recommendations": recommendations,
-        "safety_advice": safety_advice,
-        "recruiter_assessment": recruiter_assessment,
-        "is_fallback": True
-    }
-
-
-def get_groq_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords,
-                         job_title='', company='', details=None):
-    """Call Groq LLM to generate explanation. ML model is source of truth."""
-    client = _get_groq_client()
-    if client is None:
-        return get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords, job_title, company, details)
-
-    details = details or {}
-    kw_list = ', '.join(matched_keywords[:6]) if matched_keywords else 'None detected'
-    flags_list = '\n'.join(f'- {f}' for f in red_flags) if red_flags else '- No major red flags'
-
-    prompt = f"""You are ScamShield AI, an employment fraud intelligence assistant for Indian students.
-
-A job posting has been analyzed by our ML fraud detection engine. Your role is ONLY to explain the results — do NOT change or override the classification.
-
-Job Details:
-- Title: {job_title or 'Unknown'}
-- Company: {company or 'Unknown'}
-- Risk Score: {risk_score}/100
-- Risk Level: {risk_level}
-- Verdict: {risk_label}
-- Detected Scam Keywords: {kw_list}
-- Red Flags:
-{flags_list}
-
-Provide your response as a JSON object with exactly these 4 keys:
-1. "explanation": A 2-3 sentence plain-English explanation of WHY this job was flagged or deemed safe.
-2. "recommendations": A list of 3-4 specific safety recommendations.
-3. "safety_advice": One sentence of overall safety guidance.
-4. "recruiter_assessment": A brief 1-sentence assessment of recruiter trustworthiness.
-
-Respond ONLY with valid JSON. No extra text."""
-
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=600,
-        )
-        raw = response.choices[0].message.content.strip()
-        if '```' in raw:
-            raw = re.sub(r'```(?:json)?', '', raw).replace('```', '').strip()
-        import json
-        return json.loads(raw)
-    except Exception as e:
-        print("Groq explanation error:", e)
-        return get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords, job_title, company, details)
-
 
 
 def load_model(filename):
@@ -221,12 +108,46 @@ def load_model(filename):
 # Load production models from train_nlp_models.py
 nlp_pipeline = load_model('nlp_pipeline.pkl')
 logistic_model = load_model('logistic_model.pkl')
+# ── PRIMARY ML pipeline from train_nlp_models.py ──────────────────────────
+# First, register DenseTransformer globally so best_model.pkl can be unpickled
+try:
+    import sys
+    from models.inference import JobScamInferencePipeline, DenseTransformer
+    sys.modules['__main__'].DenseTransformer = DenseTransformer
+    print("[info] DenseTransformer registered globally")
+except Exception as e:
+    print(f"[warn] Could not register DenseTransformer: {e}")
+
+nlp_pipeline = load_model('nlp_pipeline.pkl')
+logistic_model = load_model('logistic_model.pkl')
 scaler = load_model('scaler.pkl')
 le_location = load_model('le_location.pkl')
 le_title = load_model('le_title.pkl')
 
+# Attempt to load Random Forest model with debugging and fallback
+try:
+    rf_path = MODEL_DIR / 'random_forest_model.pkl'
+    print(f"[RF-DEBUG] Attempting to load: {rf_path}")
+    print(f"[RF-DEBUG] Path exists: {rf_path.exists()}")
+    
+    if rf_path.exists():
+        random_forest_model = load_model('random_forest_model.pkl')
+        print(f"[RF-DEBUG] ✅ Random Forest model loaded successfully")
+    else:
+        # Fallback: Use best_model.pkl (Hybrid Model contains Random Forest)
+        print(f"[RF-DEBUG] random_forest_model.pkl not found. Using best_model.pkl as fallback")
+        best_model_path = MODEL_DIR / 'best_model.pkl'
+        if best_model_path.exists():
+            random_forest_model = load_model('best_model.pkl')
+            print(f"[RF-DEBUG] ✅ Loaded best_model.pkl (Hybrid Model with RF) as fallback")
+        else:
+            print(f"[RF-DEBUG] ⚠️  Neither random_forest_model.pkl nor best_model.pkl found")
+            random_forest_model = None
+except Exception as e:
+    print(f"[RF ERROR] Failed to load Random Forest model: {repr(e)}")
+    random_forest_model = None
+
 # Set other model placeholders to None to ensure compatibility and prevent loading
-random_forest_model = None
 xgboost_model = None
 tfidf_vectorizer = None
 
@@ -238,9 +159,8 @@ nlp_le_title = le_title
 # Uses best_model.pkl + tfidf_vectorizer.pkl + scaler.pkl + sentence_transformer.pkl
 _notebook_pipeline = None
 try:
-    import sys
-    from models.inference import JobScamInferencePipeline, DenseTransformer
-    sys.modules['__main__'].DenseTransformer = DenseTransformer
+    from models.inference import JobScamInferencePipeline
+    # DenseTransformer already registered globally above
 
     _best_model   = load_model('best_model.pkl')
     _tfidf_vec    = load_model('tfidf_vectorizer.pkl')
@@ -388,20 +308,47 @@ def keyword_fraud_score(text):
     return round(score, 2), sorted(matched.items(), key=lambda x: -x[1])
 
 
+WHITELISTED_DOMAINS = {
+    'google.com', 'gmail.com', 'microsoft.com', 'linkedin.com', 'github.com', 'github.io',
+    'amazon.com', 'amazon.in', 'apple.com', 'netflix.com', 'meta.com', 'facebook.com',
+    'twitter.com', 'x.com', 'adobe.com', 'salesforce.com', 'zoom.us', 'slack.com',
+    'oracle.com', 'ibm.com', 'accenture.com', 'tcs.com', 'wipro.com', 'infosys.com',
+    'cognizant.com', 'capgemini.com', 'deloitte.com', 'pwc.com', 'ey.com', 'kpmg.com',
+    'intel.com', 'nvidia.com', 'amd.com', 'gitlab.com', 'bitbucket.org', 'zoho.com',
+    'tcs.co.in', 'wipro.co.in', 'infosys.co.in', 'google.co.in', 'linkedin.co.in',
+    'indeed.com', 'naukri.com', 'internshala.com', 'foundit.in', 'wellfound.com',
+    'instahyre.com', 'unstop.com', 'apna.co', 'hirist.com'
+}
+
+def is_whitelisted_domain(domain):
+    domain = domain.lower().strip()
+    if domain.startswith('www.'):
+        domain = domain[4:]
+    if domain in WHITELISTED_DOMAINS:
+        return True
+    for wd in WHITELISTED_DOMAINS:
+        if domain.endswith('.' + wd):
+            return True
+    return False
+
+
 def check_domain_risk(url):
     """Assign domain risk (0–100) based on URL patterns."""
     if not url or url.strip() == '':
         return 30.0
 
     url_lower = url.lower()
+    parsed = urllib.parse.urlparse(url_lower)
+    domain = parsed.netloc.replace('www.', '')
+    if not domain and '/' not in url_lower:
+        domain = url_lower.split('/')[0]
+
+    # Whitelist handling
+    if is_whitelisted_domain(domain):
+        return 5.0  # Extremely low risk
+
     suspicious_words = ['free', 'earn', 'job-hiring', 'work-from-home', 'daily-earn',
                         'part-time', 'online-job', 'home-job', 'gig', 'quick-money']
-    trusted_domains = ['linkedin.com', 'naukri.com', 'indeed.com', 'internshala.com',
-                       'glassdoor.com', 'monster.com', 'shine.com', 'foundit.in',
-                       'adzuna.in', 'timesjobs.com', 'freshersworld.com']
-
-    if any(td in url_lower for td in trusted_domains):
-        return 10.0
 
     risk = 30.0
     if any(sw in url_lower for sw in suspicious_words):
@@ -416,12 +363,20 @@ def check_domain_risk(url):
         risk += 35.0
 
     big_brands = ['google', 'amazon', 'microsoft', 'flipkart', 'infosys', 'tcs', 'wipro']
-    parsed = urllib.parse.urlparse(url_lower)
-    domain = parsed.netloc
     for brand in big_brands:
-        if brand in domain and not domain.startswith(brand + '.'):
-            risk += 50.0
-            break
+        if brand in domain:
+            allowed_suffixes = [
+                f"{brand}.com", f"{brand}.in", f"{brand}.co.in", f"{brand}.org", 
+                f"{brand}.net", f"{brand}.co", f"{brand}.io", f"{brand}.dev"
+            ]
+            is_legit = False
+            for suf in allowed_suffixes:
+                if domain == suf or domain.endswith('.' + suf):
+                    is_legit = True
+                    break
+            if not is_legit:
+                risk += 50.0
+                break
 
     if url_lower.startswith('http://'):
         risk += 15.0
@@ -556,6 +511,389 @@ def _prediction_code(value):
         return int(value)
     except (TypeError, ValueError):
         return {'Legit': 0, 'Suspicious': 1, 'Scam': 2}.get(str(value), 0)
+
+
+# ─────────────────────────────────────────────
+# Rule-Based Scam Detection Engine
+# ─────────────────────────────────────────────
+
+def detect_scam_rules(job_data):
+    """
+    Rule-based scam detection engine.
+    Returns: (rule_score, triggered_rules, has_critical_payment_rule)
+    rule_score: 0-100 score based on triggered rules
+    triggered_rules: list of dicts with rule details
+    has_critical_payment_rule: boolean indicating if critical pre-hiring payment rule triggered
+    """
+    triggered_rules = []
+    risk_points = 0
+    has_critical_payment = False
+    
+    # Extract job posting details
+    title = str(job_data.get('title', '')).lower()
+    company = str(job_data.get('company', '')).lower()
+    description = str(job_data.get('description', '')).lower()
+    salary = str(job_data.get('salary', '')).lower()
+    company_website = str(job_data.get('company_website', '')).lower()
+    company_email = str(job_data.get('company_email', '')).lower()
+    contact_method = str(job_data.get('contact_method', '')).lower()
+    application_link = str(job_data.get('application_link', '')).lower()
+    
+    # ─── CRITICAL RULE: PRE-HIRING PAYMENT DETECTION (HIGHEST PRIORITY) ───
+    payment_keywords = [
+        'registration fee', 'registration charges', 'sign up fee',
+        'security deposit', 'refundable deposit', 'deposit required',
+        'training fee', 'training charges', 'training cost',
+        'equipment fee', 'kit fee', 'laptop fee', 'uniform fee',
+        'processing fee', 'processing charges',
+        'documentation fee', 'documentation charges',
+        'interview fee', 'interview charges',
+        'seat booking fee', 'booking fee',
+        'upfront payment', 'advance payment',
+        'joining fee'
+    ]
+    
+    if any(keyword in description for keyword in payment_keywords):
+        triggered_rules.append({
+            'rule': '🚨 PRE-HIRING PAYMENT DETECTED',
+            'risk_points': 50,
+            'category': 'CRITICAL - Payment',
+            'explanation': 'Legitimate employers generally do not require candidates to pay money as a condition of hiring. This posting contains a pre-employment payment request and should be treated as highly suspicious.',
+            'severity': 'CRITICAL'
+        })
+        risk_points += 50
+        has_critical_payment = True
+    
+    # ─── PAYMENT RULES (High Risk) - Only add if critical not already triggered ───
+    if not has_critical_payment:
+        if any(term in description for term in ['registration fee', 'registration charges', 'sign up fee']):
+            triggered_rules.append({
+                'rule': 'Registration Fee Detected',
+                'risk_points': 20,
+                'category': 'Payment',
+                'explanation': 'Legitimate employers do not charge registration fees to candidates.'
+            })
+            risk_points += 20
+        
+        if any(term in description for term in ['security deposit', 'refundable deposit', 'deposit required']):
+            triggered_rules.append({
+                'rule': 'Security Deposit Requested',
+                'risk_points': 20,
+                'category': 'Payment',
+                'explanation': 'Scammers often ask for deposits claiming they will be returned after probation.'
+            })
+            risk_points += 20
+        
+        if any(term in description for term in ['training fee', 'training charges', 'training cost']):
+            triggered_rules.append({
+                'rule': 'Training Fee Detected',
+                'risk_points': 18,
+                'category': 'Payment',
+                'explanation': 'Real companies provide training without charging employees beforehand.'
+            })
+            risk_points += 18
+        
+        if any(term in description for term in ['equipment fee', 'kit fee', 'laptop fee', 'uniform fee']):
+            triggered_rules.append({
+                'rule': 'Equipment/Kit Fee Detected',
+                'risk_points': 15,
+                'category': 'Payment',
+                'explanation': 'Employers typically provide or reimburse required equipment costs.'
+            })
+            risk_points += 15
+    
+    # ─── INTERVIEW RULES (High Risk) ───
+    if 'telegram' in contact_method or 'telegram' in description:
+        triggered_rules.append({
+            'rule': 'Telegram Interview Detected',
+            'risk_points': 18,
+            'category': 'Interview',
+            'explanation': 'Many scammers use Telegram to avoid official communication trails.'
+        })
+        risk_points += 18
+    
+    if 'whatsapp' in contact_method or ('whatsapp' in description and 'only' in description):
+        triggered_rules.append({
+            'rule': 'WhatsApp-Only Interview',
+            'risk_points': 15,
+            'category': 'Interview',
+            'explanation': 'Legitimate companies conduct interviews through official channels, not just messaging apps.'
+        })
+        risk_points += 15
+    
+    if any(term in description for term in ['no interview', 'without interview', 'direct join']):
+        triggered_rules.append({
+            'rule': 'No Interview Process',
+            'risk_points': 20,
+            'category': 'Interview',
+            'explanation': 'Positions requiring no interview and instant selection are common scam indicators.'
+        })
+        risk_points += 20
+    
+    if any(term in description for term in ['instant selection', 'immediate selection', 'guaranteed selection']):
+        triggered_rules.append({
+            'rule': 'Instant Selection Promise',
+            'risk_points': 18,
+            'category': 'Interview',
+            'explanation': 'Real companies evaluate candidates carefully; instant selection is a major red flag.'
+        })
+        risk_points += 18
+    
+    # ─── SALARY RULES (Medium-High Risk) ───
+    try:
+        salary_lower = salary.replace('₹', '').replace(',', '').replace('₹', '').strip()
+        if any(term in description for term in ['guaranteed salary', 'guaranteed income', 'assured earnings']):
+            triggered_rules.append({
+                'rule': 'Guaranteed Salary Promise',
+                'risk_points': 15,
+                'category': 'Salary',
+                'explanation': 'Companies cannot guarantee earnings; this is a common scam tactic.'
+            })
+            risk_points += 15
+    except:
+        pass
+    
+    if any(term in description for term in ['high pay for easy work', 'high salary low work', 'unlimited earnings']):
+        triggered_rules.append({
+            'rule': 'Unrealistic Compensation',
+            'risk_points': 15,
+            'category': 'Salary',
+            'explanation': 'Offers of high pay for minimal work are hallmarks of task-based scams.'
+        })
+        risk_points += 15
+    
+    # ─── COMPANY VERIFICATION RULES (Medium Risk) ───
+    if not company_website or company_website == 'unknown' or company_website == 'not provided':
+        triggered_rules.append({
+            'rule': 'Missing Company Website',
+            'risk_points': 10,
+            'category': 'Company Verification',
+            'explanation': 'Established companies typically have official websites for verification.'
+        })
+        risk_points += 10
+    
+    if not company_email or '@' not in company_email or 'gmail' in company_email or 'yahoo' in company_email:
+        triggered_rules.append({
+            'rule': 'Invalid or Free Email Domain',
+            'risk_points': 12,
+            'category': 'Company Verification',
+            'explanation': 'Professional companies use company domain emails, not free providers.'
+        })
+        risk_points += 12
+    
+    # ─── URGENCY RULES (Medium Risk) ───
+    if any(term in description for term in ['immediate joining', 'urgent hiring', 'quick hiring', 'fast hiring']):
+        triggered_rules.append({
+            'rule': 'Urgency Language Detected',
+            'risk_points': 10,
+            'category': 'Urgency',
+            'explanation': 'Scammers create artificial urgency to prevent careful verification.'
+        })
+        risk_points += 10
+    
+    if any(term in description for term in ['limited seats', 'seats limited', 'only few positions']):
+        triggered_rules.append({
+            'rule': 'Limited Positions Claim',
+            'risk_points': 8,
+            'category': 'Urgency',
+            'explanation': 'Artificial scarcity pressures candidates into quick decisions.'
+        })
+        risk_points += 8
+    
+    if any(term in description for term in ['apply now or lose', 'last chance', 'dont miss']):
+        triggered_rules.append({
+            'rule': 'FOMO Tactics Detected',
+            'risk_points': 12,
+            'category': 'Urgency',
+            'explanation': 'Fear-of-missing-out language is used to bypass rational decision-making.'
+        })
+        risk_points += 12
+    
+    # ─── DOCUMENT RULES (High Risk) ───
+    if any(term in description for term in ['aadhaar required', 'aadhar card', 'aadhaar number']):
+        triggered_rules.append({
+            'rule': 'Aadhaar Request Before Hiring',
+            'risk_points': 20,
+            'category': 'Document Request',
+            'explanation': 'Requesting Aadhaar before employment is suspicious; real employers do this during onboarding only.'
+        })
+        risk_points += 20
+    
+    if any(term in description for term in ['pan number', 'pan card required', 'pan required']):
+        triggered_rules.append({
+            'rule': 'PAN Request Before Verification',
+            'risk_points': 18,
+            'category': 'Document Request',
+            'explanation': 'PAN information should only be collected after formal job offer and verification.'
+        })
+        risk_points += 18
+    
+    if any(term in description for term in ['bank details', 'account number', 'ifsc code']):
+        triggered_rules.append({
+            'rule': 'Early Bank Details Request',
+            'risk_points': 20,
+            'category': 'Document Request',
+            'explanation': 'Scammers request bank details to steal money or commit identity fraud.'
+        })
+        risk_points += 20
+    
+    if any(term in description for term in ['payment proof', 'payment screenshot', 'transaction receipt']):
+        triggered_rules.append({
+            'rule': 'Payment Proof Request',
+            'risk_points': 22,
+            'category': 'Document Request',
+            'explanation': 'Legitimate job postings never ask for payment proofs from applicants.'
+        })
+        risk_points += 22
+    
+    # Cap the score at 100
+    rule_score = min(risk_points, 100)
+    
+    return rule_score, triggered_rules, has_critical_payment
+
+
+def generate_comprehensive_analysis(job_data, ml_score, nlp_score, community_score, matched_keywords, matched_suspicious_skills, risk_score):
+    """
+    Generate comprehensive analysis combining ML (45%), NLP (35%), Rules (15%), and Community (5%).
+    
+    Returns: dict with detailed analysis breakdown
+    
+    CRITICAL RULE: If pre-hiring payment is detected, minimum classification is HIGH RISK.
+    """
+    
+    # Get rule-based score
+    rule_score, triggered_rules, has_critical_payment = detect_scam_rules(job_data)
+    
+    # Recalculate composite score with new weights
+    # ML: 45%, NLP: 35%, Rules: 15%, Community: 5%
+    composite_score = (
+        ml_score * 0.45 +
+        nlp_score * 0.35 +
+        rule_score * 0.15 +
+        community_score * 0.05
+    )
+    
+    # CRITICAL: If pre-hiring payment detected, enforce minimum HIGH RISK (61+)
+    if has_critical_payment and composite_score < 61:
+        composite_score = 75  # Force HIGH RISK classification
+    
+    # Build ML Analysis section (45%)
+    ml_analysis = {
+        'weight': 45,
+        'score': round(ml_score, 1),
+        'contribution': round(ml_score * 0.45, 1),
+        'signals': [],
+        'confidence': 'High' if ml_score > 70 else 'Medium' if ml_score > 40 else 'Low'
+    }
+    
+    if ml_score > 70:
+        ml_analysis['signals'] = [
+            'Model flagged structural anomalies',
+            'Feature patterns match known scam indicators',
+            'Statistical outliers detected'
+        ]
+    elif ml_score > 40:
+        ml_analysis['signals'] = [
+            'Some suspicious patterns detected',
+            'Partial match with fraud indicators'
+        ]
+    else:
+        ml_analysis['signals'] = [
+            'Profile aligns with legitimate postings'
+        ]
+    
+    # Build NLP Analysis section (35%)
+    nlp_analysis = {
+        'weight': 35,
+        'score': round(nlp_score, 1),
+        'contribution': round(nlp_score * 0.35, 1),
+        'detected_patterns': matched_keywords[:5] if matched_keywords else [],
+        'suspicious_skills': matched_suspicious_skills[:4] if matched_suspicious_skills else [],
+        'confidence': 'High' if nlp_score > 70 else 'Medium' if nlp_score > 40 else 'Low'
+    }
+    
+    nlp_analysis['explanation'] = (
+        f"Detected {len(nlp_analysis['detected_patterns'])} suspicious keywords and "
+        f"{len(nlp_analysis['suspicious_skills'])} skill red flags in the job description."
+    )
+    
+    # Build Rule-Based Analysis section (15%)
+    rule_analysis = {
+        'weight': 15,
+        'score': round(rule_score, 1),
+        'contribution': round(rule_score * 0.15, 1),
+        'triggered_rules': triggered_rules,
+        'total_triggered': len(triggered_rules),
+        'has_critical_payment': has_critical_payment,
+        'confidence': 'High' if rule_score > 0 else 'None'
+    }
+    
+    # Build Community Analysis section (5%)
+    community_analysis = {
+        'weight': 5,
+        'score': round(community_score, 1),
+        'contribution': round(community_score * 0.05, 1),
+        'reports': int(community_score / 20.0) if community_score > 0 else 0,
+        'confidence': 'Verified' if community_score > 0 else 'Not reported'
+    }
+    
+    # Determine risk level from composite score
+    if composite_score <= 30:
+        risk_verdict = 'LOW RISK'
+        verdict_icon = '🟢'
+        verdict_reason = 'This job posting exhibits minimal scam indicators across all analysis layers.'
+    elif composite_score <= 60:
+        risk_verdict = 'MEDIUM RISK'
+        verdict_icon = '🟡'
+        verdict_reason = 'This job posting contains some suspicious elements that warrant careful verification.'
+    else:
+        risk_verdict = 'HIGH RISK'
+        verdict_icon = '🔴'
+        if has_critical_payment:
+            verdict_reason = '🚨 CRITICAL: This job posting requests payment from candidates before employment. This is a hallmark of employment scams. Do not proceed.'
+        else:
+            verdict_reason = 'This job posting exhibits multiple scam indicators and should be avoided.'
+    
+    # Build recommendations based on analysis
+    recommendations = []
+    
+    # Add critical payment warning first
+    if has_critical_payment:
+        recommendations.append('❌ NEVER pay any fee to secure employment (registration, deposit, training, etc.)')
+        recommendations.append('Report this posting to job portal authorities immediately')
+    
+    if rule_score > 20:
+        for rule in triggered_rules[:3]:
+            if 'CRITICAL' not in rule.get('category', ''):
+                recommendations.append(rule['rule'])
+    
+    if nlp_score > 50 and nlp_analysis['detected_patterns']:
+        recommendations.append(f"Verify company legitimacy (keywords detected: {', '.join(nlp_analysis['detected_patterns'][:2])})")
+    
+    if community_score > 0:
+        recommendations.append(f"⚠️ {community_analysis['reports']} similar scam reports found")
+    
+    if not recommendations:
+        recommendations = [
+            'Research the company on LinkedIn and official website',
+            'Verify all communication through official corporate channels',
+            'Never share personal documents or financial information upfront'
+        ]
+    
+    return {
+        'composite_score': round(composite_score, 1),
+        'ml_analysis': ml_analysis,
+        'nlp_analysis': nlp_analysis,
+        'rule_analysis': rule_analysis,
+        'community_analysis': community_analysis,
+        'verdict': {
+            'risk_level': risk_verdict,
+            'icon': verdict_icon,
+            'reason': verdict_reason,
+            'recommendations': recommendations[:4],
+            'has_critical_payment': has_critical_payment
+        }
+    }
 
 
 # ─────────────────────────────────────────────
@@ -938,10 +1276,6 @@ def about_page():
     return render_template('about.html')
 
 
-@app.route('/awareness')
-def awareness_page():
-    return render_template('awareness.html')
-
 
 @app.route('/community')
 def community_page():
@@ -951,17 +1285,6 @@ def community_page():
     except Exception as e:
         print("Error fetching community reports:", e)
     return render_template('community.html', recent_reports=recent_reports)
-
-
-@app.route('/threat-intel')
-def threat_intel_page():
-    scam_reports = []
-    try:
-        scam_reports = get_scam_reports(limit=10)
-    except Exception as e:
-        print("Error fetching threat intel data:", e)
-    return render_template('threat_intel.html', scam_reports=scam_reports)
-
 
 @app.route('/domain-check', methods=['GET', 'POST'])
 def domain_check_page():
@@ -1363,21 +1686,28 @@ def analyze():
         except Exception as e:
             print(f"Error logging activity: {e}")
 
-        # Groq explanation
+        # Groq explanation (removed - Groq integration disabled)
         groq_data = None
-        try:
-            groq_data = get_groq_explanation(
-                risk_score=risk_score,
-                risk_level=risk_level,
-                risk_label=risk_label,
-                red_flags=red_flags,
-                matched_keywords=details.get('matched_keywords', []),
-                job_title=job_title,
-                company=company,
-                details=details
-            )
-        except Exception as e:
-            print(f"Groq explanation error: {e}")
+
+        # Generate comprehensive analysis (ML + NLP + Rules + Community)
+        comprehensive_analysis = generate_comprehensive_analysis(
+            job_data={
+                'title': job_title,
+                'company': company,
+                'description': description,
+                'salary': salary or '',
+                'company_website': '',
+                'company_email': '',
+                'contact_method': application_method or '',
+                'application_link': url or ''
+            },
+            ml_score=ml_score,
+            nlp_score=float(nlp_proba[2] * 100),  # Scam probability from NLP
+            community_score=community_score,
+            matched_keywords=details.get('matched_keywords', []),
+            matched_suspicious_skills=details.get('matched_suspicious_skills', []),
+            risk_score=risk_score
+        )
 
         return jsonify({
             'prediction': prediction,  # 0=Legit, 1=Suspicious, 2=Scam
@@ -1389,6 +1719,7 @@ def analyze():
             'red_flags': red_flags,
             'tips': tips,
             'groq_explanation': groq_data,
+            'comprehensive_analysis': comprehensive_analysis,
             'models_loaded': {
                 'nlp': nlp_pipeline is not None,
                 'lr': logistic_model is not None,
@@ -1897,16 +2228,8 @@ def offer_letter_analyze_image():
 
     red_flags = [f['name'] for f in risk_factors if f['detected']]
 
+    # Groq explanation (removed - Groq integration disabled)
     groq_data = None
-    try:
-        groq_data = get_groq_explanation(
-            risk_score=risk_score, risk_level=risk_level, risk_label=risk_label,
-            red_flags=red_flags, matched_keywords=matched_keywords,
-            job_title='Image / Poster', company=company or 'Unknown',
-            details={'keyword_score': round(kw_score, 1), 'domain_score': 0, 'salary_score': 0, 'nlp_model_score': 0}
-        )
-    except Exception:
-        pass
 
     try:
         log_activity(session['user'], f'Image Scanned — {risk_level}')
@@ -2066,6 +2389,11 @@ def verify_domain(url_input):
         trust_score = max(0, 100 - bl_risk)
         risk_level = 'CRITICAL'
         status = 'Blacklisted'
+    elif is_whitelisted_domain(domain):
+        trust_score = 98
+        risk_level = 'LOW'
+        status = 'Verified Trusted'
+        reasons.append(f'✅ Verified trusted domain: {domain}')
     else:
         # 2. Trusted platform check
         if any(tp in domain for tp in TRUSTED_PLATFORMS):
@@ -2096,10 +2424,20 @@ def verify_domain(url_input):
             big_brands = ['google', 'amazon', 'microsoft', 'flipkart', 'infosys',
                           'tcs', 'wipro', 'accenture', 'ibm', 'deloitte']
             for brand in big_brands:
-                if brand in domain and not domain.startswith(brand + '.'):
-                    deductions += 45
-                    reasons.append(f'Possible brand impersonation of "{brand}"')
-                    break
+                if brand in domain:
+                    allowed_suffixes = [
+                        f"{brand}.com", f"{brand}.in", f"{brand}.co.in", f"{brand}.org", 
+                        f"{brand}.net", f"{brand}.co", f"{brand}.io", f"{brand}.dev"
+                    ]
+                    is_legit = False
+                    for suf in allowed_suffixes:
+                        if domain == suf or domain.endswith('.' + suf):
+                            is_legit = True
+                            break
+                    if not is_legit:
+                        deductions += 45
+                        reasons.append(f'Possible brand impersonation of "{brand}"')
+                        break
 
             # 7. Suspicious keywords in domain
             sus_words = ['free', 'earn', 'job-hiring', 'work-from-home', 'daily-earn',
@@ -2789,26 +3127,8 @@ def offer_letter_analyze():
 
     red_flags = [f['name'] for f in risk_factors if f['detected']]
 
-    # ── 5. Groq explanation ──────────────────────────────────────────────────
+    # ── 5. Groq explanation (removed - Groq integration disabled) ──────────────────────────────────────────────────
     groq_data = None
-    try:
-        groq_data = get_groq_explanation(
-            risk_score=risk_score,
-            risk_level=risk_level,
-            risk_label=risk_label,
-            red_flags=red_flags,
-            matched_keywords=matched_keywords,
-            job_title='Offer Letter',
-            company=company or 'Unknown',
-            details={
-                'keyword_score': round(kw_score, 1),
-                'domain_score': 0,
-                'salary_score': 0,
-                'nlp_model_score': 0,
-            }
-        )
-    except Exception as e:
-        print('Groq offer letter error:', e)
 
     ai_explanation = (groq_data or {}).get('explanation', '')
     recommendations = (groq_data or {}).get('recommendations', [
@@ -2948,4 +3268,4 @@ def offer_letter_report():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=5007)

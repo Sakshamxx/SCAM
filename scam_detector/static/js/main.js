@@ -141,16 +141,7 @@ async function runAnalysis() {
   const context = { job_title: payload.job_title, company: payload.company };
 
   try {
-    const res  = await fetch('/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-
-    if (data.error) {
-      throw new Error(data.error);
-    }
+    const data = await ScamShieldAPI.analyzeJob(payload);
 
     const enriched = Object.assign({}, data, {
       job_title:        payload.job_title,
@@ -309,6 +300,13 @@ function loadResultsFromSession() {
   // Pre-fill Report Scam link with company name
   if (typeof updateReportLink === 'function') {
     updateReportLink(context.company || data.company || '');
+  }
+
+  // Initialize comprehensive analysis cards if data available
+  if (data.comprehensive_analysis && typeof initializeAnalysis === 'function') {
+    setTimeout(() => {
+      initializeAnalysis(data.comprehensive_analysis);
+    }, 100);
   }
 }
 
@@ -530,12 +528,7 @@ async function autoFillFromURL() {
   if (statusEl) statusEl.textContent = '⏳ Fetching...';
 
   try {
-    const res  = await fetch('/scrape', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
-    });
-    const data = await res.json();
+    const data = await ScamShieldAPI.scrapeJob(url);
 
     if (data.error) {
       showToast('❌ ' + data.error, 'error');
@@ -727,3 +720,15 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   }
 })();
 
+// ── Expose functions to window for backward compatibility with onclick handlers ──
+window.loadExample          = loadExample;
+window.clearForm            = clearForm;
+window.autoFillFromURL      = autoFillFromURL;
+window.showToast            = showToast;
+window.runAnalysis          = runAnalysis;
+window.runAnalysisAndRedirect = runAnalysisAndRedirect;
+window.resetForm            = resetForm;
+window.animateGauge         = animateGauge;
+window.setBar               = setBar;
+window.renderGroqExplanation = renderGroqExplanation;
+window.loadResultsFromSession = loadResultsFromSession;

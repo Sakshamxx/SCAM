@@ -251,6 +251,99 @@
       </div>
     </div>
 
+    <!-- ── COMPREHENSIVE ANALYSIS SECTION ── -->
+    <div class="analysis-section" id="analysisSection" style="display:none">
+      <h2>📊 Comprehensive Analysis</h2>
+      
+      <!-- Analysis Grid -->
+      <div class="analysis-grid" id="analysisGrid">
+        <!-- ML Analysis Card -->
+        <div class="analysis-card" id="mlCard">
+          <div class="analysis-card-header">
+            <span class="analysis-card-title">🤖 Machine Learning</span>
+            <span class="analysis-weight-badge">45%</span>
+          </div>
+          <div class="analysis-score-display">
+            <div class="analysis-score-value" id="mlScore">0</div>
+            <div class="analysis-score-label">Model Score</div>
+          </div>
+          <div class="score-bar">
+            <div class="score-bar-fill" id="mlScoreBar" style="width: 0%"></div>
+          </div>
+          <div class="confidence-badge confidence-high" id="mlConfidence">High</div>
+          <div class="analysis-items" id="mlSignals"></div>
+        </div>
+
+        <!-- NLP Analysis Card -->
+        <div class="analysis-card" id="nlpCard">
+          <div class="analysis-card-header">
+            <span class="analysis-card-title">📝 Text Analysis</span>
+            <span class="analysis-weight-badge">35%</span>
+          </div>
+          <div class="analysis-score-display">
+            <div class="analysis-score-value" id="nlpScore">0</div>
+            <div class="analysis-score-label">Pattern Score</div>
+          </div>
+          <div class="score-bar">
+            <div class="score-bar-fill" id="nlpScoreBar" style="width: 0%"></div>
+          </div>
+          <div class="confidence-badge confidence-high" id="nlpConfidence">High</div>
+          <div id="nlpPatterns">
+            <div style="font-weight: 500; color: #e2e8f0; margin-bottom: 8px;">Suspicious Keywords:</div>
+            <ul class="patterns-list" id="patternsList"></ul>
+          </div>
+        </div>
+
+        <!-- Rule-Based Analysis Card -->
+        <div class="analysis-card" id="ruleCard">
+          <div class="analysis-card-header">
+            <span class="analysis-card-title">⚙️ Rule Engine</span>
+            <span class="analysis-weight-badge">15%</span>
+          </div>
+          <div class="analysis-score-display">
+            <div class="analysis-score-value" id="ruleScore">0</div>
+            <div class="analysis-score-label">Risk Score</div>
+          </div>
+          <div class="score-bar">
+            <div class="score-bar-fill" id="ruleScoreBar" style="width: 0%"></div>
+          </div>
+          <div style="margin-top: 12px; font-size: 0.9rem; color: #cbd5e1;" id="ruleCount">
+            <span id="triggeredRuleCount">0</span> rules triggered
+          </div>
+          <div id="rulesList" style="margin-top: 12px; max-height: 250px; overflow-y: auto;"></div>
+        </div>
+
+        <!-- Community Intelligence Card -->
+        <div class="analysis-card" id="communityCard">
+          <div class="analysis-card-header">
+            <span class="analysis-card-title">👥 Community</span>
+            <span class="analysis-weight-badge">5%</span>
+          </div>
+          <div class="analysis-score-display">
+            <div class="analysis-score-value" id="communityScore">0</div>
+            <div class="analysis-score-label">Report Score</div>
+          </div>
+          <div class="score-bar">
+            <div class="score-bar-fill" id="communityScoreBar" style="width: 0%"></div>
+          </div>
+          <div class="confidence-badge confidence-medium" id="communityConfidence">Verified</div>
+          <div class="analysis-items" id="communityReports"></div>
+        </div>
+      </div>
+
+      <!-- Verdict Card -->
+      <div class="verdict-card" id="verdictCard">
+        <div class="verdict-icon" id="verdictIcon">🔍</div>
+        <div class="verdict-title" id="verdictTitle">Analyzing...</div>
+        <div class="verdict-reason" id="verdictReason">Processing your analysis</div>
+        
+        <div class="verdict-recommendations">
+          <h4>📋 Key Recommendations:</h4>
+          <div id="recommendationsList"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -346,6 +439,8 @@
     }
   }
 </script>
+<script src="{{ url_for('static', filename='js/analysis.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/clickspark.js') }}"></script>
 </body>
 </html>

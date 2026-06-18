@@ -17,9 +17,7 @@
     <div class="nav-links" id="navLinks">
       <a href="/" class="nav-link">Home</a>
       <a href="/analyze-job" class="nav-link">Analyze Job</a>
-      <a href="/awareness" class="nav-link">Awareness</a>
       <a href="/community" class="nav-link">Community</a>
-      <a href="/threat-intel" class="nav-link">Threat Intel</a>
       <a href="/about" class="nav-link">About AI</a>
       
       {% if session.get('user') %}
@@ -45,8 +43,6 @@
             <a href="/verify-company" class="dropdown-item">🌐 Verify Company</a>
             <a href="/domain-check" class="dropdown-item">🛡️ Domain Check</a>
             <a href="/community" class="dropdown-item">👥 Community</a>
-            <a href="/threat-intel" class="dropdown-item">🔴 Threat Intel</a>
-            <a href="/awareness" class="dropdown-item">📖 Awareness Hub</a>
             <a href="/report-scam" class="dropdown-item">⚠️ Report Scam</a>
             <div class="dropdown-divider"></div>
             <a href="/logout" class="dropdown-item logout">🚪 Logout</a>
@@ -125,3 +121,6 @@
     }, duration);
   }
 </script>
+
+<script type="module" src="{{ url_for('static', filename='js/api.js') }}"></script>
+

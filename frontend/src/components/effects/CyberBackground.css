@@ -1,0 +1,199 @@
+.cyber-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #0a0a0f;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.cyber-base {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #0a0a0f 0%, #0f0f1e 50%, #0a0a0f 100%);
+  z-index: 0;
+}
+
+/* Gradient orbs for depth */
+.cyber-orb {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(120px);
+  z-index: 2;
+  will-change: transform;
+}
+
+.cyber-orb-primary {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #6339e4 0%, #6339e4 20%, transparent 70%);
+  opacity: 0.25;
+  top: 10%;
+  left: 20%;
+  mix-blend-mode: screen;
+}
+
+.cyber-orb-secondary {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #7d5ce4 0%, #7d5ce4 20%, transparent 70%);
+  opacity: 0.15;
+  bottom: -100px;
+  right: 10%;
+  mix-blend-mode: screen;
+}
+
+.cyber-orb-tertiary {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #5a2d9d 0%, #5a2d9d 20%, transparent 70%);
+  opacity: 0.1;
+  top: 50%;
+  left: 60%;
+  mix-blend-mode: multiply;
+}
+
+/* Digital grid */
+.cyber-grid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  opacity: 0.6;
+  will-change: opacity;
+}
+
+/* Matrix particles */
+.cyber-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.cyber-particle {
+  position: absolute;
+  background: #6339e4;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #6339e4, 0 0 12px rgba(99, 57, 228, 0.4);
+  will-change: transform;
+}
+
+/* Pulsing accent glows */
+.cyber-pulse-glow {
+  position: fixed;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #6339e4 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(100px);
+  top: 30%;
+  left: 10%;
+  opacity: 0.3;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 2;
+  will-change: opacity, transform;
+}
+
+.cyber-pulse-glow-secondary {
+  width: 400px;
+  height: 400px;
+  top: auto;
+  bottom: 10%;
+  left: auto;
+  right: 15%;
+}
+
+/* Content container */
+.cyber-content {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .cyber-orb-primary {
+    width: 400px;
+    height: 400px;
+    opacity: 0.2;
+  }
+
+  .cyber-orb-secondary {
+    width: 350px;
+    height: 350px;
+    opacity: 0.1;
+  }
+
+  .cyber-orb-tertiary {
+    width: 250px;
+    height: 250px;
+    opacity: 0.08;
+  }
+
+  .cyber-pulse-glow {
+    width: 300px;
+    height: 300px;
+    opacity: 0.2;
+  }
+
+  .cyber-pulse-glow-secondary {
+    width: 250px;
+    height: 250px;
+  }
+
+  .cyber-grid {
+    opacity: 0.4;
+  }
+
+  .cyber-particle {
+    box-shadow: 0 0 4px #6339e4, 0 0 8px rgba(99, 57, 228, 0.3);
+  }
+}
+
+/* High performance optimizations */
+@supports (will-change: transform) {
+  .cyber-orb,
+  .cyber-particles,
+  .cyber-pulse-glow,
+  .cyber-particle {
+    will-change: transform;
+  }
+}
+
+/* Dark mode enforcement */
+@media (prefers-color-scheme: dark) {
+  .cyber-background {
+    background: #0a0a0f;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .cyber-orb,
+  .cyber-pulse-glow,
+  .cyber-particle {
+    animation: none !important;
+  }
+
+  .cyber-orb-secondary,
+  .cyber-orb-tertiary {
+    animation: none !important;
+  }
+
+  /* Static fallback for animations */
+  svg {
+    animation: none !important;
+  }
+}

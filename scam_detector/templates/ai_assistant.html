@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Career & Security Assistant — ScamShield AI</title>
+  <meta name="description" content="Chat with ScamShield AI about internships, job offers, resume verification, and career safety." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* Premium Page-Specific Styles for AI Assistant */
+    .assistant-container {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      height: calc(100vh - 70px);
+      max-width: 1440px;
+      margin: 0 auto;
+      background: rgba(15, 15, 26, 0.6);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-left: 1px solid rgba(255, 255, 255, 0.05);
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .chat-sidebar {
+      background: rgba(22, 22, 39, 0.5);
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .new-chat-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary, #6366f1), #8b5cf6);
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      font-size: 0.88rem;
+    }
+
+    .new-chat-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+
+    .sessions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .session-item {
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-sub, #94a3b8);
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .session-item:hover, .session-item.active {
+      background: rgba(99, 102, 241, 0.08);
+      border-color: rgba(99, 102, 241, 0.3);
+      color: #fff;
+    }
+
+    .session-title-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .delete-session-btn {
+      background: none;
+      border: none;
+      color: #ef4444;
+      opacity: 0;
+      cursor: pointer;
+      padding: 2px 6px;
+      transition: opacity 0.2s ease;
+    }
+
+    .session-item:hover .delete-session-btn {
+      opacity: 0.8;
+    }
+
+    .delete-session-btn:hover {
+      opacity: 1 !important;
+    }
+
+    .chat-area {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: rgba(15, 15, 26, 0.4);
+      position: relative;
+    }
+
+    .chat-header {
+      padding: 16px 28px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(22, 22, 39, 0.2);
+    }
+
+    .chat-header-title h3 {
+      font-size: 1.05rem;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .chat-header-title p {
+      font-size: 0.78rem;
+      color: var(--text-sub, #94a3b8);
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 28px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .message-bubble {
+      max-width: 75%;
+      padding: 16px 20px;
+      border-radius: 16px;
+      font-size: 0.92rem;
+      line-height: 1.6;
+      word-wrap: break-word;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .message-bubble.user {
+      align-self: flex-end;
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      color: #e0e7ff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message-bubble.assistant {
+      align-self: flex-start;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: #f1f5f9;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message-bubble p {
+      margin-bottom: 10px;
+    }
+
+    .message-bubble p:last-child {
+      margin-bottom: 0;
+    }
+
+    .message-bubble ul, .message-bubble ol {
+      margin-left: 20px;
+      margin-bottom: 10px;
+    }
+
+    .message-bubble ul:last-child, .message-bubble ol:last-child {
+      margin-bottom: 0;
+    }
+
+    .message-doc-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #fcd34d;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+    }
+
+    .chat-input-panel {
+      padding: 20px 28px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(22, 22, 39, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .active-attachment-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      color: #fcd34d;
+    }
+
+    .active-attachment-bar button {
+      background: none;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .chat-input-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .chat-input-field {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #fff;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-family: inherit;
+      font-size: 0.92rem;
+      transition: all 0.2s ease;
+    }
+
+    .chat-input-field:focus {
+      outline: none;
+      border-color: var(--primary, #6366f1);
+      background: rgba(255, 255, 255, 0.05);
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
+    }
+
+    .attach-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      font-size: 1.2rem;
+    }
+
+    .attach-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(99, 102, 241, 0.3);
+    }
+
+    .chat-send-btn {
+      background: linear-gradient(135deg, var(--primary, #6366f1), #8b5cf6);
+      color: #fff;
+      border: none;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      font-size: 1.1rem;
+    }
+
+    .chat-send-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+
+    /* Document Upload Drawer/Modal */
+    .upload-drawer {
+      display: none;
+      position: absolute;
+      bottom: 110px;
+      left: 28px;
+      background: rgba(22, 22, 39, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      width: 380px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      backdrop-filter: blur(25px);
+    }
+
+    .drawer-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .drawer-close {
+      background: none;
+      border: none;
+      color: var(--text-sub, #94a3b8);
+      cursor: pointer;
+      font-size: 1.1rem;
+    }
+
+    .doc-type-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .doc-type-tab {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-sub, #94a3b8);
+      padding: 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .doc-type-tab.active {
+      background: rgba(99, 102, 241, 0.15);
+      border-color: rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+    }
+
+    .upload-dropzone {
+      border: 1.5px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .upload-dropzone:hover {
+      border-color: var(--primary, #6366f1);
+      background: rgba(99, 102, 241, 0.02);
+    }
+
+    .upload-dropzone-icon {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+    }
+
+    .upload-dropzone-text {
+      font-size: 0.8rem;
+      color: var(--text-sub, #94a3b8);
+    }
+
+    .upload-dropzone-subtext {
+      font-size: 0.7rem;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    /* Typing Indicator Animation */
+    .typing-indicator {
+      align-self: flex-start;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 12px 20px;
+      border-radius: 16px;
+      border-bottom-left-radius: 4px;
+      display: none;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--text-sub, #94a3b8);
+      border-radius: 50%;
+      animation: typingPulse 1.2s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typingPulse {
+      0%, 100% { transform: translateY(0); opacity: 0.4; }
+      50% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Welcome / Empty state */
+    .chat-empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .empty-icon {
+      font-size: 3.5rem;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--primary, #6366f1), #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .empty-title {
+      font-size: 1.35rem;
+      color: #fff;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .empty-subtitle {
+      font-size: 0.88rem;
+      color: var(--text-sub, #94a3b8);
+      max-width: 480px;
+      line-height: 1.6;
+    }
+
+    .career-suggestions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 30px;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    .suggestion-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 0.8rem;
+      color: var(--text-sub, #94a3b8);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .suggestion-card:hover {
+      background: rgba(99, 102, 241, 0.05);
+      border-color: rgba(99, 102, 241, 0.25);
+      color: #fff;
+    }
+
+    @media (max-width: 768px) {
+      .assistant-container {
+        grid-template-columns: 1fr;
+      }
+      .chat-sidebar {
+        display: none; /* simple responsive fallback */
+      }
+      .upload-drawer {
+        width: calc(100% - 56px);
+        left: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  {% include 'components/navbar.html' %}
+
+  <div class="hero-bg-grid" style="z-index: 1;"></div>
+
+  <div class="assistant-container">
+    
+    <!-- SESSIONS SIDEBAR -->
+    <div class="chat-sidebar">
+      <div class="sidebar-header">
+        <h4 style="color:#fff; font-size:0.92rem; font-weight:700;">Conversations</h4>
+      </div>
+      <button class="new-chat-btn" id="newChatBtn">
+        <span>+</span> New Chat
+      </button>
+      <div class="sessions-list" id="sessionsList">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- MAIN CHAT AREA -->
+    <div class="chat-area">
+      
+      <!-- HEADER -->
+      <div class="chat-header">
+        <div class="chat-header-title">
+          <h3 id="activeSessionTitle">ScamShield AI Assistant</h3>
+          <p id="activeSessionSub">Your security & career counselor</p>
+        </div>
+        <div style="font-size: 0.78rem; background:rgba(16,185,129,0.12); color:#6ee7b7; border:1px solid rgba(16,185,129,0.2); padding:4px 12px; border-radius:20px; font-weight:600;">
+          Groq LLaMA 3.1
+        </div>
+      </div>
+
+      <!-- MESSAGES DISPLAY -->
+      <div class="chat-messages" id="chatMessages">
+        
+        <!-- EMPTY CONVERSATION WELCOME -->
+        <div class="chat-empty-state" id="emptyState">
+          <div class="empty-icon">🤖</div>
+          <h4 class="empty-title">Ask ScamShield AI</h4>
+          <p class="empty-subtitle">
+            Get instant security insights and career counseling. Upload resumes or offer letters to check for scam indicators, or ask career-related questions.
+          </p>
+          <div class="career-suggestions">
+            <div class="suggestion-card" data-prompt="How can I identify a fake job offer letter?">
+              🔍 <strong>Identify Fake Offers</strong><br/>
+              What are the top flags in a hiring contract?
+            </div>
+            <div class="suggestion-card" data-prompt="What should I check before applying to a job URL?">
+              🌐 <strong>Verify Job URLs</strong><br/>
+              How do I spot domain fraud and phishing portals?
+            </div>
+            <div class="suggestion-card" data-prompt="What credentials should I hide on my resume for safety?">
+              📄 <strong>Resume Security</strong><br/>
+              How to avoid identity theft during job hunts.
+            </div>
+            <div class="suggestion-card" data-prompt="Is it normal for a recruiter to ask for a training fee?">
+              💸 <strong>Hiring Fees</strong><br/>
+              Are security deposits standard?
+            </div>
+          </div>
+        </div>
+
+        <!-- TYPING INDICATOR -->
+        <div class="typing-indicator" id="typingIndicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+
+      </div>
+
+      <!-- CHAT INPUT PANEL -->
+      <div class="chat-input-panel">
+        
+        <!-- Document context indicator -->
+        <div class="active-attachment-bar" id="activeAttachmentBar">
+          <div>
+            📁 Attached Context: <strong id="attachmentName">—</strong> (<span id="attachmentType">document</span>)
+          </div>
+          <button id="removeAttachmentBtn">Remove</button>
+        </div>
+
+        <div class="chat-input-row">
+          
+          <button class="attach-btn" id="attachBtn" title="Attach Resume or Offer Letter PDF">
+            📎
+          </button>
+          
+          <input 
+            type="text" 
+            class="chat-input-field" 
+            id="chatInputField" 
+            placeholder="Type your message here... (e.g. Is this offer letter suspicious?)"
+            autocomplete="off"
+          />
+          
+          <button class="chat-send-btn" id="sendBtn">
+            ➜
+          </button>
+
+        </div>
+      </div>
+
+      <!-- DOCUMENT UPLOAD DRAWER (ATTACH MODAL) -->
+      <div class="upload-drawer" id="uploadDrawer">
+        <div class="drawer-title">
+          <span>Attach Document context</span>
+          <button class="drawer-close" id="drawerCloseBtn">×</button>
+        </div>
+        
+        <div class="doc-type-tabs">
+          <button class="doc-type-tab active" id="tabResume" data-type="resume">📄 Resume Review</button>
+          <button class="doc-type-tab" id="tabOffer" data-type="offer_letter">📜 Offer Letter Review</button>
+        </div>
+
+        <div class="upload-dropzone" id="uploadDropzone">
+          <div class="upload-dropzone-icon">📁</div>
+          <div class="upload-dropzone-text">Click to select PDF document</div>
+          <div class="upload-dropzone-subtext">Supports PDF only (Max 10MB)</div>
+          <input type="file" id="pdfFileInput" accept="application/pdf" style="display:none;" />
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- React-Friendly ES Modules -->
+  <script type="module" src="{{ url_for('static', filename='js/api.js') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='js/ui/chat.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/clickspark.js') }}"></script>
+
+</body>
+</html>

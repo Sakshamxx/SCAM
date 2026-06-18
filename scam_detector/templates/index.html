@@ -8,524 +8,590 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* Modernized styling overrides for Homepage */
+    :root {
+      --neon-blue: #6366f1;
+      --neon-purple: #a855f7;
+      --neon-green: #10b981;
+      --neon-amber: #f59e0b;
+      --dark-card: rgba(22, 22, 39, 0.45);
+      --glass-border: rgba(255, 255, 255, 0.08);
+    }
+
+    body {
+      background-color: #0b0b14;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+
+    /* Animated background glow */
+    .bg-glow {
+      position: absolute;
+      width: 40vw;
+      height: 40vw;
+      background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.05) 50%, rgba(0,0,0,0) 100%);
+      top: -10vw;
+      right: -10vw;
+      z-index: 0;
+      pointer-events: none;
+      filter: blur(80px);
+    }
+
+    .bg-glow-2 {
+      position: absolute;
+      width: 30vw;
+      height: 30vw;
+      background: radial-gradient(circle, rgba(16,185,129,0.1) 0%, rgba(0,0,0,0) 70%);
+      top: 40%;
+      left: -10vw;
+      z-index: 0;
+      pointer-events: none;
+      filter: blur(60px);
+    }
+
+    /* Hero section update */
+    .hero {
+      position: relative;
+      z-index: 10;
+      padding: 120px 24px 80px;
+      gap: 60px;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #a5b4fc 0%, #c084fc 50%, #6366f1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-badge {
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+    }
+
+    .hero-stats {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 24px;
+      margin: 32px 0;
+    }
+
+    /* Glassmorphic Cards */
+    .scam-card, .step-card {
+      background: var(--dark-card) !important;
+      border: 1px solid var(--glass-border) !important;
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      border-radius: 16px !important;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .scam-card:hover, .step-card:hover {
+      transform: translateY(-5px) !important;
+      border-color: rgba(99, 102, 241, 0.4) !important;
+      box-shadow: 0 10px 30px rgba(99, 102, 241, 0.15) !important;
+      background: rgba(22, 22, 39, 0.65) !important;
+    }
+
+    /* Modern CTA buttons */
+    .hero-cta {
+      border-radius: 12px;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+    }
+
+    .hero-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(99, 102, 241, 0.45);
+    }
+
+    /* Live Threat Matrix Mockup */
+    .dashboard-preview-widget {
+      background: rgba(22, 22, 39, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+      margin-top: 40px;
+    }
+
+    .dashboard-preview-widget::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple), var(--neon-green));
+    }
+
+    .widget-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 12px;
+    }
+
+    .widget-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--neon-green);
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+      animation: pulse 1.5s infinite;
+    }
+
+    .faq-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      padding: 20px;
+      background: none;
+      border: none;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1), padding 0.3s ease;
+      padding: 0 20px;
+      color: var(--text-sub);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .faq-answer.open {
+      padding: 0 20px 20px;
+      max-height: 200px;
+    }
+
+    .faq-arrow {
+      transition: transform 0.3s ease;
+    }
+
+    .faq-arrow.open {
+      transform: rotate(180deg);
+    }
+  </style>
 </head>
 <body>
 
-<!-- ── NAVBAR ── -->
-{% include 'components/navbar.html' %}
+  <!-- NAVBAR -->
+  {% include 'components/navbar.html' %}
 
-<!-- ── HERO ── -->
-<section class="hero">
-  <div class="hero-bg-grid"></div>
-  <div class="hero-content">
-    <div class="hero-badge">
-      <span class="pulse-dot"></span>
-      Employment Fraud Intelligence Platform
-    </div>
-    <h1 class="hero-title">
-      Protect Students From<br/>
-      <span class="gradient-text">Fake Internships & Job Scams</span>
-    </h1>
-    <p class="hero-subtitle">
-      AI-powered scam detection using machine learning, NLP, fraud analytics, domain intelligence and risk assessment.
-      Protecting India's students from employment fraud.
-    </p>
+  <!-- BG GLOWS -->
+  <div class="bg-glow"></div>
+  <div class="bg-glow-2"></div>
 
-    <!-- Live Statistics -->
-    <div class="hero-stats" id="heroStats">
-      <div class="stat">
-        <span class="stat-num" id="statAnalyses">—</span>
-        <span class="stat-label">Jobs Analyzed</span>
+  <!-- HERO SECTION -->
+  <section class="hero">
+    <div class="hero-bg-grid"></div>
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="pulse-dot"></span>
+        Employment Fraud Intelligence Platform
       </div>
-      <div class="stat-divider"></div>
-      <div class="stat">
-        <span class="stat-num" id="statScams">—</span>
-        <span class="stat-label">Scams Detected</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat">
-        <span class="stat-num" id="statReports">—</span>
-        <span class="stat-label">Reports Filed</span>
-      </div>
-      <div class="stat-divider"></div>
-      <div class="stat">
-        <span class="stat-num" id="statAccuracy">96%</span>
-        <span class="stat-label">ML Accuracy</span>
-      </div>
-    </div>
+      <h1 class="hero-title">
+        Protect Students From<br/>
+        <span class="gradient-text">Fake Internships & Job Scams</span>
+      </h1>
+      <p class="hero-subtitle">
+        AI-powered scam detection using machine learning, NLP, fraud analytics, domain intelligence and risk assessment.
+        Protecting India's students from employment fraud.
+      </p>
 
-    <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:8px;">
-      <a href="/analyze-job" class="hero-cta" id="ctaAnalyze">
-        🔍 Analyze Job Posting →
-      </a>
-      <a href="/dashboard" class="hero-cta" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.35); color:#a5b4fc; {% if not session.get('user') %}display:none;{% endif %}" id="ctaDashboard">
-        📊 Open Dashboard
-      </a>
-      <a href="/login" class="hero-cta" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.35); color:#a5b4fc; {% if session.get('user') %}display:none;{% endif %}">
-        🔐 Sign In
-      </a>
-    </div>
-  </div>
-  <div class="hero-visual">
-    <div class="floating-card card-1">
-      <span class="card-icon">🔴</span>
-      <div>
-        <div class="card-title">Risk Score: 87/100</div>
-        <div class="card-sub">Probable Scam Detected</div>
-      </div>
-    </div>
-    <div class="floating-card card-2">
-      <span class="card-icon">⚠️</span>
-      <div>
-        <div class="card-title">WhatsApp HR detected</div>
-        <div class="card-sub">High-risk phrase</div>
-      </div>
-    </div>
-    <div class="floating-card card-3">
-      <span class="card-icon">🟢</span>
-      <div>
-        <div class="card-title">linkedin.com</div>
-        <div class="card-sub">Trusted domain</div>
-      </div>
-    </div>
-    <div class="floating-card" style="top:60%; left:10%; animation-delay:1.8s; animation-duration:4.5s;">
-      <span class="card-icon">🤖</span>
-      <div>
-        <div class="card-title">Groq AI Explanation</div>
-        <div class="card-sub">Powered by LLaMA 3.1</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── FRAUD DETECTION WORKFLOW ── -->
-<section class="how-it-works" id="how-it-works">
-  <div class="container">
-    <h2 class="section-title">Fraud Detection Workflow</h2>
-    <p class="section-sub">6-layer AI protection running simultaneously on every submission</p>
-
-    <!-- Workflow Visual -->
-    <div style="display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; margin-bottom:48px;">
-      {% set steps = [
-        ('📝', 'Job Posting', '#6366f1'),
-        ('🔤', 'NLP Analysis', '#8b5cf6'),
-        ('⚙️', 'Fraud Engine', '#ef4444'),
-        ('📊', 'Risk Score', '#f59e0b'),
-        ('🤖', 'AI Explanation', '#10b981'),
-        ('📄', 'Intel Report', '#06b6d4')
-      ] %}
-      {% for icon, label, color in steps %}
-      <div style="display:flex; align-items:center; gap:8px;">
-        <div style="background:rgba({{ '99,102,241' if loop.first else '255,255,255' }},0.08); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px 18px; text-align:center; min-width:110px;">
-          <div style="font-size:1.5rem; margin-bottom:4px;">{{ icon }}</div>
-          <div style="font-size:0.78rem; color:#e2e8f0; font-weight:500;">{{ label }}</div>
+      <!-- Live Statistics -->
+      <div class="hero-stats" id="heroStats">
+        <div class="stat">
+          <span class="stat-num" id="statAnalyses">—</span>
+          <span class="stat-label">Jobs Analyzed</span>
         </div>
-        {% if not loop.last %}
-        <div style="color:#475569; font-size:1.2rem; flex-shrink:0;">→</div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-
-    <div class="steps-grid">
-      <div class="step-card">
-        <div class="step-icon" style="background:#e8f4ff">📝</div>
-        <div class="step-num">01</div>
-        <h3>NLP Analysis</h3>
-        <p>TF-IDF + Logistic Regression scans job description for scam-like language patterns</p>
-        <div class="step-weight">Weight: 10%</div>
-      </div>
-      <div class="step-card">
-        <div class="step-icon" style="background:#fff0e8">🔑</div>
-        <div class="step-num">02</div>
-        <h3>Keyword Scoring</h3>
-        <p>40+ weighted fraud keywords checked — from "registration fee" to "WhatsApp HR"</p>
-        <div class="step-weight">Weight: 40%</div>
-      </div>
-      <div class="step-card">
-        <div class="step-icon" style="background:#e8ffe8">🌐</div>
-        <div class="step-num">03</div>
-        <h3>Domain Risk</h3>
-        <p>URL analyzed for trusted portals, brand impersonation, free hosting &amp; shorteners</p>
-        <div class="step-weight">Weight: 30%</div>
-      </div>
-      <div class="step-card">
-        <div class="step-icon" style="background:#f0e8ff">💰</div>
-        <div class="step-num">04</div>
-        <h3>Salary Anomaly</h3>
-        <p>Unrealistically high salary promises are a classic scam signal — we detect them</p>
-        <div class="step-weight">Weight: 20%</div>
-      </div>
-      <div class="step-card">
-        <div class="step-icon" style="background:#e8fff4">🤖</div>
-        <div class="step-num">05</div>
-        <h3>Groq AI Explanation</h3>
-        <p>LLaMA 3.1 generates plain-English explanations of why a job was flagged</p>
-        <div class="step-weight">Powered by Groq</div>
-      </div>
-      <div class="step-card">
-        <div class="step-icon" style="background:#fff8e8">📄</div>
-        <div class="step-num">06</div>
-        <h3>Intelligence Report</h3>
-        <p>Downloadable PDF fraud intelligence report with all risk factors and recommendations</p>
-        <div class="step-weight">ReportLab PDF</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── FEATURE CARDS ── -->
-<section class="scam-types" id="features">
-  <div class="container">
-    <h2 class="section-title">Platform Features</h2>
-    <p class="section-sub">A complete employment fraud intelligence toolkit for Indian students</p>
-    <div class="scam-grid">
-      <a href="/analyze-job" class="scam-card" style="text-decoration:none; cursor:pointer;">
-        <span class="scam-emoji">🛡️</span>
-        <h3>Scam Detection</h3>
-        <p>ML + NLP ensemble detecting 40+ fraud signals with 96% accuracy</p>
-      </a>
-      <a href="/awareness" class="scam-card" style="text-decoration:none; cursor:pointer;">
-        <span class="scam-emoji">📖</span>
-        <h3>Scam Awareness Hub</h3>
-        <p>Learn to identify WhatsApp, Telegram, advance fee, and identity theft scams</p>
-      </a>
-      <a href="/verify-company" class="scam-card" style="text-decoration:none; cursor:pointer;">
-        <span class="scam-emoji">🔍</span>
-        <h3>Recruiter Verification</h3>
-        <p>Trust scoring, domain checks, blacklist lookup and company authenticity</p>
-      </a>
-      <a href="/domain-check" class="scam-card" style="text-decoration:none; cursor:pointer;">
-        <span class="scam-emoji">🌐</span>
-        <h3>Domain Intelligence</h3>
-        <p>SSL check, brand impersonation detection, free host and shortener analysis</p>
-      </a>
-      <a href="/analyze-job" class="scam-card" style="text-decoration:none; cursor:pointer;">
-        <span class="scam-emoji">📄</span>
-        <h3>PDF Reports</h3>
-        <p>Downloadable fraud intelligence reports with full analysis breakdown</p>
-      </a>
-      <a href="/community" class="scam-card" style="text-decoration:none; cursor:pointer;">
-        <span class="scam-emoji">👥</span>
-        <h3>Community Reporting</h3>
-        <p>Report scams, browse community alerts and help protect other students</p>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- ── RECENT SCAM ALERTS ── -->
-<section style="padding:80px 0; background:rgba(239,68,68,0.04);">
-  <div class="container">
-    <h2 class="section-title">Recent Scam Alerts</h2>
-    <p class="section-sub">Active threats detected by our community and AI system</p>
-    <div style="display:flex; flex-direction:column; gap:12px; max-width:800px; margin:0 auto;">
-      <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:14px; padding:16px 20px; display:flex; align-items:center; gap:14px;">
-        <div style="width:10px; height:10px; background:#ef4444; border-radius:50%; flex-shrink:0; animation:pulse 1.5s infinite;"></div>
-        <div style="flex:1;">
-          <span style="font-weight:600; color:#fca5a5; font-size:0.9rem;">CRITICAL</span>
-          <span style="color:#e2e8f0; font-size:0.88rem; margin-left:8px;">WhatsApp "task job" scam — ₹300/task leading to ₹5,000+ deposit demand</span>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-num" id="statScams">—</span>
+          <span class="stat-label">Scams Detected</span>
         </div>
-        <span style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap;">Today</span>
-      </div>
-      <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:14px; padding:16px 20px; display:flex; align-items:center; gap:14px;">
-        <div style="width:10px; height:10px; background:#f59e0b; border-radius:50%; flex-shrink:0;"></div>
-        <div style="flex:1;">
-          <span style="font-weight:600; color:#fcd34d; font-size:0.9rem;">HIGH</span>
-          <span style="color:#e2e8f0; font-size:0.88rem; margin-left:8px;">Fake Infosys offer letters circulating via WhatsApp — AI-generated with fake logos</span>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-num" id="statReports">—</span>
+          <span class="stat-label">Reports Filed</span>
         </div>
-        <span style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap;">Yesterday</span>
-      </div>
-      <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:14px; padding:16px 20px; display:flex; align-items:center; gap:14px;">
-        <div style="width:10px; height:10px; background:#f59e0b; border-radius:50%; flex-shrink:0;"></div>
-        <div style="flex:1;">
-          <span style="font-weight:600; color:#fcd34d; font-size:0.9rem;">HIGH</span>
-          <span style="color:#e2e8f0; font-size:0.88rem; margin-left:8px;">Brand impersonation: google-careers-apply.in collecting student data and fees</span>
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-num" id="statAccuracy">96%</span>
+          <span class="stat-label">ML Accuracy</span>
         </div>
-        <span style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap;">2 days ago</span>
       </div>
-      <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); border-radius:14px; padding:16px 20px; display:flex; align-items:center; gap:14px;">
-        <div style="width:10px; height:10px; background:#6366f1; border-radius:50%; flex-shrink:0;"></div>
-        <div style="flex:1;">
-          <span style="font-weight:600; color:#a5b4fc; font-size:0.9rem;">MEDIUM</span>
-          <span style="color:#e2e8f0; font-size:0.88rem; margin-left:8px;">Telegram "crypto trading internship" requiring ₹2000 wallet loading to start</span>
+
+      <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:8px;">
+        <a href="/analyze-job" class="hero-cta" id="ctaAnalyze">
+          🔍 Analyze Job Posting →
+        </a>
+        <a href="/dashboard" class="hero-cta" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.35); color:#a5b4fc; {% if not session.get('user') %}display:none;{% endif %}" id="ctaDashboard">
+          📊 Open Dashboard
+        </a>
+        <a href="/login" class="hero-cta" style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.35); color:#a5b4fc; {% if session.get('user') %}display:none;{% endif %}">
+          🔐 Sign In
+        </a>
+      </div>
+    </div>
+    
+    <div class="hero-visual">
+      <!-- Live Threat Matrix Mockup -->
+      <div class="dashboard-preview-widget">
+        <div class="widget-header">
+          <div style="display:flex; align-items:center;">
+            <span class="widget-dot"></span>
+            <span style="font-size:0.75rem; font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:0.05em;">ScamShield Monitor</span>
+          </div>
+          <span style="font-size:0.7rem; color:var(--neon-blue); font-weight:700;">LIVE SCANNING</span>
         </div>
-        <span style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap;">3 days ago</span>
+        
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; font-size:0.75rem; padding:8px; border-radius:6px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.15);">
+            <span style="color:#fca5a5; font-weight:600;">⚠️ Threat Blocked: Fake Google Form</span>
+            <span style="color:#ef4444; font-family:monospace; font-weight:700;">Score: 89%</span>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; font-size:0.75rem; padding:8px; border-radius:6px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.15);">
+            <span style="color:#6ee7b7; font-weight:600;">✅ Verified Domain: careers.google.com</span>
+            <span style="color:#10b981; font-family:monospace; font-weight:700;">Score: 98%</span>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:space-between; font-size:0.75rem; padding:8px; border-radius:6px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.15);">
+            <span style="color:#fcd34d; font-weight:600;">🟡 Suspicious: Telegram HR Interview</span>
+            <span style="color:#f59e0b; font-family:monospace; font-weight:700;">Score: 54%</span>
+          </div>
+        </div>
+        
+        <div style="margin-top:14px; text-align:center;">
+          <span style="font-size:0.68rem; color:var(--text-sub);">AI Engine ensemble status: <strong style="color:var(--neon-green);">ACTIVE</strong></span>
+        </div>
       </div>
     </div>
-    <div style="text-align:center; margin-top:28px;">
-      <a href="/threat-intel" style="color:#a5b4fc; font-size:0.9rem; text-decoration:none; border-bottom:1px solid rgba(165,180,252,0.3); padding-bottom:2px;">
-        View All Threat Intelligence →
-      </a>
-    </div>
-  </div>
-</section>
+  </section>
 
-<!-- ── COMMON SCAMS ── -->
-<section class="scam-types" id="scam-types">
-  <div class="container">
-    <h2 class="section-title">Common Scam Patterns We Detect</h2>
-    <p class="section-sub">ScamShield is trained to recognize these and many more fraud tactics</p>
-    <div class="scam-grid">
-      <div class="scam-card">
-        <span class="scam-emoji">💸</span>
-        <h3>Pay-to-Work</h3>
-        <p>Registration fees, security deposits, or "training fees" before joining</p>
-      </div>
-      <div class="scam-card">
-        <span class="scam-emoji">📱</span>
-        <h3>WhatsApp Hiring</h3>
-        <p>Recruiters who only communicate via WhatsApp with no email/office</p>
-      </div>
-      <div class="scam-card">
-        <span class="scam-emoji">🏦</span>
-        <h3>Fake Salary Lure</h3>
-        <p>₹50,000–1 Lakh/month for zero-experience or simple tasks</p>
-      </div>
-      <div class="scam-card">
-        <span class="scam-emoji">🌐</span>
-        <h3>Brand Impersonation</h3>
-        <p>Fake Google, Amazon, TCS job posts with lookalike domains</p>
-      </div>
-      <div class="scam-card">
-        <span class="scam-emoji">📋</span>
-        <h3>Data Entry / Task Scams</h3>
-        <p>Copy-paste, online tasks, survey jobs promising daily cash</p>
-      </div>
-      <div class="scam-card">
-        <span class="scam-emoji">🔗</span>
-        <h3>MLM / Referral Chains</h3>
-        <p>Multi-level marketing disguised as legitimate internships</p>
-      </div>
-    </div>
-  </div>
-</section>
+  <!-- FRAUD DETECTION WORKFLOW -->
+  <section class="how-it-works" id="how-it-works">
+    <div class="container">
+      <h2 class="section-title">Fraud Detection Workflow</h2>
+      <p class="section-sub">6-layer AI protection running simultaneously on every submission</p>
 
-<!-- ── PLATFORM BENEFITS ── -->
-<section style="padding:80px 0;">
-  <div class="container">
-    <h2 class="section-title">Why Choose ScamShield AI?</h2>
-    <p class="section-sub">Built specifically for Indian students by Graphura India</p>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:24px; margin-top:40px;">
-      <div style="background:linear-gradient(135deg, rgba(99,102,241,0.1), rgba(99,102,241,0.04)); border:1px solid rgba(99,102,241,0.2); border-radius:18px; padding:28px;">
-        <div style="font-size:2rem; margin-bottom:14px;">🎯</div>
-        <h3 style="color:#e2e8f0; margin-bottom:10px; font-size:1rem;">96% Detection Accuracy</h3>
-        <p style="color:var(--text-sub); font-size:0.87rem; line-height:1.7;">Our ML ensemble combines NLP, keyword analysis, domain intelligence and salary anomaly detection for industry-leading accuracy.</p>
+      <div style="display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; margin-bottom:48px;">
+        {% set steps = [
+          ('📝', 'Job Posting', '#6366f1'),
+          ('🔤', 'NLP Analysis', '#8b5cf6'),
+          ('⚙️', 'Fraud Engine', '#ef4444'),
+          ('📊', 'Risk Score', '#f59e0b'),
+          ('🤖', 'AI Explanation', '#10b981'),
+          ('📄', 'Intel Report', '#06b6d4')
+        ] %}
+        {% for icon, label, color in steps %}
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="background:rgba({{ '99,102,241' if loop.first else '255,255,255' }},0.08); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:12px 18px; text-align:center; min-width:110px;">
+            <div style="font-size:1.5rem; margin-bottom:4px;">{{ icon }}</div>
+            <div style="font-size:0.78rem; color:#e2e8f0; font-weight:500;">{{ label }}</div>
+          </div>
+          {% if not loop.last %}
+          <div style="color:#475569; font-size:1.2rem; flex-shrink:0;">→</div>
+          {% endif %}
+        </div>
+        {% endfor %}
       </div>
-      <div style="background:linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.04)); border:1px solid rgba(16,185,129,0.2); border-radius:18px; padding:28px;">
-        <div style="font-size:2rem; margin-bottom:14px;">⚡</div>
-        <h3 style="color:#e2e8f0; margin-bottom:10px; font-size:1rem;">Real-Time Analysis</h3>
-        <p style="color:var(--text-sub); font-size:0.87rem; line-height:1.7;">Get complete fraud analysis in seconds. Paste any job posting URL and our scraper auto-fills all fields for instant analysis.</p>
-      </div>
-      <div style="background:linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.04)); border:1px solid rgba(245,158,11,0.2); border-radius:18px; padding:28px;">
-        <div style="font-size:2rem; margin-bottom:14px;">🤖</div>
-        <h3 style="color:#e2e8f0; margin-bottom:10px; font-size:1rem;">Groq AI Explanations</h3>
-        <p style="color:var(--text-sub); font-size:0.87rem; line-height:1.7;">Powered by LLaMA 3.1, Groq explains exactly why a job was flagged in plain English, with specific safety recommendations.</p>
-      </div>
-      <div style="background:linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.04)); border:1px solid rgba(239,68,68,0.2); border-radius:18px; padding:28px;">
-        <div style="font-size:2rem; margin-bottom:14px;">🛡️</div>
-        <h3 style="color:#e2e8f0; margin-bottom:10px; font-size:1rem;">Community Intelligence</h3>
-        <p style="color:var(--text-sub); font-size:0.87rem; line-height:1.7;">Community-reported scams feed into our blacklist database, making the platform smarter with every report submitted.</p>
-      </div>
-    </div>
-  </div>
-</section>
 
-<!-- ── FAQ ── -->
-<section style="padding:80px 0; background:rgba(99,102,241,0.03);" id="faq">
-  <div class="container">
-    <h2 class="section-title">Frequently Asked Questions</h2>
-    <p class="section-sub">Everything you need to know about ScamShield AI</p>
-    <div style="max-width:760px; margin:40px auto 0; display:flex; flex-direction:column; gap:16px;" id="faqContainer">
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>Is ScamShield AI free to use?</span>
-          <span class="faq-arrow">▼</span>
-        </button>
-        <div class="faq-answer">Yes. ScamShield AI is completely free for all students. Create an account, analyze as many job postings as you want, and download PDF reports — all at no cost.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>How accurate is the fraud detection?</span>
-          <span class="faq-arrow">▼</span>
-        </button>
-        <div class="faq-answer">Our ML ensemble achieves 96% accuracy on our training dataset of 5,500+ job postings. The model combines NLP (TF-IDF + Logistic Regression), keyword scoring (40+ signals), domain risk analysis and salary anomaly detection.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>What does Groq AI do in the analysis?</span>
-          <span class="faq-arrow">▼</span>
-        </button>
-        <div class="faq-answer">Groq AI (powered by LLaMA 3.1) generates natural-language explanations of the ML analysis. It explains WHY a job was flagged, provides specific safety recommendations, and gives a recruiter assessment. Critically, Groq does NOT perform classification — the ML model is always the source of truth for the risk score and verdict.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>Can I analyze a job posting URL directly?</span>
-          <span class="faq-arrow">▼</span>
-        </button>
-        <div class="faq-answer">Yes! Our web scraper supports automatic extraction from Internshala, LinkedIn, Naukri, Indeed, and most generic job sites. Just paste the URL in the analysis form and click "Fetch Job Details" to auto-fill all fields.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>What should I do if I've already paid a scammer?</span>
-          <span class="faq-arrow">▼</span>
-        </button>
-        <div class="faq-answer">File a complaint at cybercrime.gov.in immediately. Also report to your bank to potentially freeze the transaction. Then report the company on ScamShield to warn other students. Never pay again — legitimate employers do not ask for money.</div>
-      </div>
-      <div class="faq-item">
-        <button class="faq-question" onclick="toggleFaq(this)">
-          <span>How do I report a scam company?</span>
-          <span class="faq-arrow">▼</span>
-        </button>
-        <div class="faq-answer">Go to the Report Scam page (accessible from the navbar after logging in). Fill in the company name, website, and description of the fraud. Your report helps protect other students and will be reviewed by our admin team.</div>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-icon" style="background:rgba(99,102,241,0.15)">📝</div>
+          <div class="step-num">01</div>
+          <h3>NLP Analysis</h3>
+          <p>TF-IDF + Logistic Regression scans job description for scam-like language patterns</p>
+          <div class="step-weight">Weight: 10%</div>
+        </div>
+        <div class="step-card">
+          <div class="step-icon" style="background:rgba(239,68,68,0.15)">🔑</div>
+          <div class="step-num">02</div>
+          <h3>Keyword Scoring</h3>
+          <p>40+ weighted fraud keywords checked — from "registration fee" to "WhatsApp HR"</p>
+          <div class="step-weight">Weight: 40%</div>
+        </div>
+        <div class="step-card">
+          <div class="step-icon" style="background:rgba(16,185,129,0.15)">🌐</div>
+          <div class="step-num">03</div>
+          <h3>Domain Risk</h3>
+          <p>URL analyzed for trusted portals, brand impersonation, free hosting &amp; shorteners</p>
+          <div class="step-weight">Weight: 30%</div>
+        </div>
+        <div class="step-card">
+          <div class="step-icon" style="background:rgba(245,158,11,0.15)">💰</div>
+          <div class="step-num">04</div>
+          <h3>Salary Anomaly</h3>
+          <p>Unrealistically high salary promises are a classic scam signal — we detect them</p>
+          <div class="step-weight">Weight: 20%</div>
+        </div>
+        <div class="step-card">
+          <div class="step-icon" style="background:rgba(139,92,246,0.15)">🤖</div>
+          <div class="step-num">05</div>
+          <h3>Groq AI Explanation</h3>
+          <p>LLaMA 3.1 generates plain-English explanations of why a job was flagged</p>
+          <div class="step-weight">Powered by Groq</div>
+        </div>
+        <div class="step-card">
+          <div class="step-icon" style="background:rgba(6,182,212,0.15)">📄</div>
+          <div class="step-num">06</div>
+          <h3>Intelligence Report</h3>
+          <p>Downloadable PDF fraud intelligence report with all risk factors and recommendations</p>
+          <div class="step-weight">ReportLab PDF</div>
+        </div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- ── FUTURE ROADMAP ── -->
-<section style="padding:80px 0;" id="roadmap">
-  <div class="container">
-    <h2 class="section-title">Future Roadmap</h2>
-    <p class="section-sub">Coming soon to ScamShield AI</p>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:20px; margin-top:40px;">
-      <div class="scam-card" style="opacity:0.7; border:1px dashed rgba(99,102,241,0.3);">
-        <span class="scam-emoji">🌐</span>
-        <h3>Browser Extension</h3>
-        <p>Real-time scam detection while browsing job portals — no copy-paste needed</p>
-        <div style="margin-top:10px;"><span style="background:rgba(99,102,241,0.15); color:#a5b4fc; font-size:0.72rem; padding:3px 10px; border-radius:20px;">Q3 2025</span></div>
-      </div>
-      <div class="scam-card" style="opacity:0.7; border:1px dashed rgba(99,102,241,0.3);">
-        <span class="scam-emoji">📧</span>
-        <h3>Email Scam Detection</h3>
-        <p>Paste recruitment emails to detect phishing and fake offer letters</p>
-        <div style="margin-top:10px;"><span style="background:rgba(99,102,241,0.15); color:#a5b4fc; font-size:0.72rem; padding:3px 10px; border-radius:20px;">Q4 2025</span></div>
-      </div>
-      <div class="scam-card" style="opacity:0.7; border:1px dashed rgba(99,102,241,0.3);">
-        <span class="scam-emoji">📱</span>
-        <h3>Mobile App</h3>
-        <p>Android and iOS app for analyzing job postings on the go</p>
-        <div style="margin-top:10px;"><span style="background:rgba(99,102,241,0.15); color:#a5b4fc; font-size:0.72rem; padding:3px 10px; border-radius:20px;">2026</span></div>
-      </div>
-      <div class="scam-card" style="opacity:0.7; border:1px dashed rgba(99,102,241,0.3);">
-        <span class="scam-emoji">🔔</span>
-        <h3>Real-Time Alerts</h3>
-        <p>Push notifications when a company you applied to gets reported</p>
-        <div style="margin-top:10px;"><span style="background:rgba(99,102,241,0.15); color:#a5b4fc; font-size:0.72rem; padding:3px 10px; border-radius:20px;">2026</span></div>
-      </div>
-      <div class="scam-card" style="opacity:0.7; border:1px dashed rgba(99,102,241,0.3);">
-        <span class="scam-emoji">💬</span>
-        <h3>AI Chat Assistant</h3>
-        <p>Ask our AI any question about job scams and get instant guidance</p>
-        <div style="margin-top:10px;"><span style="background:rgba(99,102,241,0.15); color:#a5b4fc; font-size:0.72rem; padding:3px 10px; border-radius:20px;">2026</span></div>
-      </div>
-      <div class="scam-card" style="opacity:0.7; border:1px dashed rgba(99,102,241,0.3);">
-        <span class="scam-emoji">🔌</span>
-        <h3>Chrome Extension</h3>
-        <p>One-click analysis of any job posting visible in your browser tab</p>
-        <div style="margin-top:10px;"><span style="background:rgba(99,102,241,0.15); color:#a5b4fc; font-size:0.72rem; padding:3px 10px; border-radius:20px;">2026</span></div>
+  <!-- FEATURE CARDS -->
+  <section class="scam-types" id="features">
+    <div class="container">
+      <h2 class="section-title">Platform Features</h2>
+      <p class="section-sub">A complete employment fraud intelligence toolkit for Indian students</p>
+      <div class="scam-grid">
+        <a href="/analyze-job" class="scam-card" style="text-decoration:none; cursor:pointer;">
+          <span class="scam-emoji">🛡️</span>
+          <h3>Scam Detection</h3>
+          <p>ML + NLP ensemble detecting 40+ fraud signals with 96% accuracy</p>
+        </a>
+        <a href="/verify-company" class="scam-card" style="text-decoration:none; cursor:pointer;">
+          <span class="scam-emoji">🔍</span>
+          <h3>Recruiter Verification</h3>
+          <p>Trust scoring, domain checks, blacklist lookup and company authenticity</p>
+        </a>
+        <a href="/domain-check" class="scam-card" style="text-decoration:none; cursor:pointer;">
+          <span class="scam-emoji">🌐</span>
+          <h3>Domain Intelligence</h3>
+          <p>SSL check, brand impersonation detection, free host and shortener analysis</p>
+        </a>
+        <a href="/analyze-job" class="scam-card" style="text-decoration:none; cursor:pointer;">
+          <span class="scam-emoji">📄</span>
+          <h3>PDF Reports</h3>
+          <p>Downloadable fraud intelligence reports with full analysis breakdown</p>
+        </a>
+        <a href="/community" class="scam-card" style="text-decoration:none; cursor:pointer;">
+          <span class="scam-emoji">👥</span>
+          <h3>Community Reporting</h3>
+          <p>Report scams, browse community alerts and help protect other students</p>
+        </a>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- ── CALL TO ACTION ── -->
-<section style="padding:80px 0; background:linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08));">
-  <div class="container" style="text-align:center;">
-    <h2 class="section-title" style="font-size:2.2rem;">Start Protecting Yourself Today</h2>
-    <p class="section-sub" style="font-size:1rem; max-width:540px; margin:0 auto 32px;">Join thousands of Indian students using ScamShield AI to verify job postings and avoid fraud. Free forever.</p>
-    <div style="display:flex; gap:14px; justify-content:center; flex-wrap:wrap;">
-      <a href="{% if session.get('user') %}/analyze-job{% else %}/signup{% endif %}" class="hero-cta" style="padding:16px 40px; font-size:1.05rem;">
-        {% if session.get('user') %}🔍 Analyze a Job{% else %}🚀 Get Started Free{% endif %}
-      </a>
-      <a href="/awareness" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#e2e8f0; padding:16px 40px; border-radius:100px; font-size:1.05rem; text-decoration:none; font-weight:600;">
-        📖 Learn About Scams
-      </a>
+  <!-- RECENT SCAM ALERTS -->
+  <section style="padding:80px 0; background:rgba(239,68,68,0.02); border-top:1px solid rgba(239,68,68,0.08); border-bottom:1px solid rgba(239,68,68,0.08);">
+    <div class="container">
+      <h2 class="section-title">Recent Scam Alerts</h2>
+      <p class="section-sub">Active threats detected by our community and AI system</p>
+      <div style="display:flex; flex-direction:column; gap:12px; max-width:800px; margin:0 auto;">
+        <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.2); border-radius:14px; padding:16px 20px; display:flex; align-items:center; gap:14px;">
+          <div style="width:10px; height:10px; background:#ef4444; border-radius:50%; flex-shrink:0; animation:pulse 1.5s infinite;"></div>
+          <div style="flex:1;">
+            <span style="font-weight:600; color:#fca5a5; font-size:0.9rem;">CRITICAL</span>
+            <span style="color:#e2e8f0; font-size:0.88rem; margin-left:8px;">WhatsApp "task job" scam — ₹300/task leading to ₹5,000+ deposit demand</span>
+          </div>
+          <span style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap;">Today</span>
+        </div>
+        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:14px; padding:16px 20px; display:flex; align-items:center; gap:14px;">
+          <div style="width:10px; height:10px; background:#f59e0b; border-radius:50%; flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <span style="font-weight:600; color:#fcd34d; font-size:0.9rem;">HIGH</span>
+            <span style="color:#e2e8f0; font-size:0.88rem; margin-left:8px;">Fake Infosys offer letters circulating via WhatsApp — AI-generated with fake logos</span>
+          </div>
+          <span style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap;">Yesterday</span>
+        </div>
+        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:14px; padding:16px 20px; display:flex; align-items:center; gap:14px;">
+          <div style="width:10px; height:10px; background:#f59e0b; border-radius:50%; flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <span style="font-weight:600; color:#fcd34d; font-size:0.9rem;">HIGH</span>
+            <span style="color:#e2e8f0; font-size:0.88rem; margin-left:8px;">Brand impersonation: google-careers-apply.in collecting student data and fees</span>
+          </div>
+          <span style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap;">2 days ago</span>
+        </div>
+        <div style="background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.2); border-radius:14px; padding:16px 20px; display:flex; align-items:center; gap:14px;">
+          <div style="width:10px; height:10px; background:#6366f1; border-radius:50%; flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <span style="font-weight:600; color:#a5b4fc; font-size:0.9rem;">MEDIUM</span>
+            <span style="color:#e2e8f0; font-size:0.88rem; margin-left:8px;">Telegram "crypto trading internship" requiring ₹2000 wallet loading to start</span>
+          </div>
+          <span style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap;">3 days ago</span>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:28px;">
+        <a href="/community" style="color:#a5b4fc; font-size:0.9rem; text-decoration:none; border-bottom:1px solid rgba(165,180,252,0.3); padding-bottom:2px;">
+          View Community Reports →
+        </a>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- ── FOOTER ── -->
-<footer class="footer">
-  <div class="container">
-    <div class="footer-inner">
-      <div class="footer-brand">
-        <img
-          src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}"
-          alt="Graphura"
-          class="graphura-logo"
-        >
-        <span>ScamShield AI</span>
-        <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
-      </div>
-      <div class="footer-links">
-        <a href="/" class="footer-link">Home</a>
-        <a href="/analyze-job" class="footer-link">Analyze Job</a>
-        <a href="/awareness" class="footer-link">Awareness Hub</a>
-        <a href="/community" class="footer-link">Community</a>
-        <a href="/threat-intel" class="footer-link">Threat Intel</a>
-        <a href="/domain-check" class="footer-link">Domain Check</a>
-        <a href="/about" class="footer-link">About AI</a>
-      </div>
-      <div class="footer-note">
-        Employment Fraud Intelligence Platform · NLP + ML + Groq AI · 96% Accuracy · Protecting India's Students
+  <!-- FAQ SECTION -->
+  <section style="padding:80px 0; background:rgba(99,102,241,0.01);" id="faq">
+    <div class="container">
+      <h2 class="section-title">Frequently Asked Questions</h2>
+      <p class="section-sub">Everything you need to know about ScamShield AI</p>
+      <div style="max-width:760px; margin:40px auto 0; display:flex; flex-direction:column; gap:16px;" id="faqContainer">
+        <div class="faq-item">
+          <button class="faq-question">
+            <span>Is ScamShield AI free to use?</span>
+            <span class="faq-arrow">▼</span>
+          </button>
+          <div class="faq-answer">Yes. ScamShield AI is completely free for all students. Create an account, analyze as many job postings as you want, and download PDF reports — all at no cost.</div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">
+            <span>How accurate is the fraud detection?</span>
+            <span class="faq-arrow">▼</span>
+          </button>
+          <div class="faq-answer">Our ML ensemble achieves 96% accuracy on our training dataset of 5,500+ job postings. The model combines NLP (TF-IDF + Logistic Regression), keyword scoring (40+ signals), domain risk analysis and salary anomaly detection.</div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">
+            <span>What does Groq AI do in the analysis?</span>
+            <span class="faq-arrow">▼</span>
+          </button>
+          <div class="faq-answer">Groq AI (powered by LLaMA 3.1) generates natural-language explanations of the ML analysis. It explains WHY a job was flagged, provides specific safety recommendations, and gives a recruiter assessment. Critically, Groq does NOT perform classification — the ML model is always the source of truth for the risk score and verdict.</div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">
+            <span>Can I analyze a job posting URL directly?</span>
+            <span class="faq-arrow">▼</span>
+          </button>
+          <div class="faq-answer">Yes! Our web scraper supports automatic extraction from Internshala, LinkedIn, Naukri, Indeed, and most generic job sites. Just paste the URL in the analysis form and click "Fetch Job Details" to auto-fill all fields.</div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">
+            <span>What should I do if I've already paid a scammer?</span>
+            <span class="faq-arrow">▼</span>
+          </button>
+          <div class="faq-answer">File a complaint at cybercrime.gov.in immediately. Also report to your bank to potentially freeze the transaction. Then report the company on ScamShield to warn other students. Never pay again — legitimate employers do not ask for money.</div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-question">
+            <span>How do I report a scam company?</span>
+            <span class="faq-arrow">▼</span>
+          </button>
+          <div class="faq-answer">Go to the Report Scam page (accessible from the navbar after logging in). Fill in the company name, website, and description of the fraud. Your report helps protect other students and will be reviewed by our admin team.</div>
+        </div>
       </div>
     </div>
-  </div>
-</footer>
+  </section>
 
-<script>
-// Live Stats Counter Animation
-async function loadLiveStats() {
-  try {
-    const resp = await fetch('/api/stats');
-    const data = await resp.json();
-    animateCounter('statAnalyses', data.total_analyses || 0);
-    animateCounter('statScams', data.scams_detected || 0);
-    animateCounter('statReports', data.reports_submitted || 0);
-  } catch(e) {
-    // Fallback to static values
-    document.getElementById('statAnalyses').textContent = '5,500+';
-    document.getElementById('statScams').textContent = '2,400+';
-    document.getElementById('statReports').textContent = '180+';
-  }
-}
+  <!-- CALL TO ACTION -->
+  <section style="padding:80px 0; background:linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.05)); border-top:1px solid rgba(255,255,255,0.03);">
+    <div class="container" style="text-align:center;">
+      <h2 class="section-title" style="font-size:2.2rem;">Start Protecting Yourself Today</h2>
+      <p class="section-sub" style="font-size:1rem; max-width:540px; margin:0 auto 32px;">Join thousands of Indian students using ScamShield AI to verify job postings and avoid fraud. Free forever.</p>
+      <div style="display:flex; gap:14px; justify-content:center; flex-wrap:wrap;">
+        <a href="{% if session.get('user') %}/analyze-job{% else %}/signup{% endif %}" class="hero-cta" style="padding:16px 40px; font-size:1.05rem;">
+          {% if session.get('user') %}🔍 Analyze a Job{% else %}🚀 Get Started Free{% endif %}
+        </a>
+      </div>
+    </div>
+  </section>
 
-function animateCounter(id, target) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const duration = 1800;
-  const step = target / (duration / 16);
-  let current = 0;
-  const timer = setInterval(() => {
-    current = Math.min(current + step, target);
-    el.textContent = Math.round(current).toLocaleString('en-IN');
-    if (current >= target) {
-      clearInterval(timer);
-      el.textContent = target > 0 ? Math.round(target).toLocaleString('en-IN') : '—';
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <img src="{{ url_for('static', filename='images/graphura_india_private_limited_logo.jpeg') }}" alt="Graphura" class="graphura-logo">
+          <span>ScamShield AI</span>
+          <span class="footer-tag">by Graphura India Pvt. Ltd.</span>
+        </div>
+        <div class="footer-links">
+          <a href="/" class="footer-link">Home</a>
+          <a href="/analyze-job" class="footer-link">Analyze Job</a>
+          <a href="/community" class="footer-link">Community</a>
+          <a href="/domain-check" class="footer-link">Domain Check</a>
+          <a href="/about" class="footer-link">About AI</a>
+        </div>
+        <div class="footer-note">
+          Employment Fraud Intelligence Platform · NLP + ML + Groq AI · 96% Accuracy · Protecting India's Students
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Live Stats Counter Animation
+    async function loadLiveStats() {
+      try {
+        const resp = await fetch('/api/stats');
+        const data = await resp.json();
+        animateCounter('statAnalyses', data.total_analyses || 0);
+        animateCounter('statScams', data.scams_detected || 0);
+        animateCounter('statReports', data.reports_submitted || 0);
+      } catch(e) {
+        document.getElementById('statAnalyses').textContent = '5,500+';
+        document.getElementById('statScams').textContent = '2,400+';
+        document.getElementById('statReports').textContent = '180+';
+      }
     }
-  }, 16);
-}
 
-// FAQ Toggle
-function toggleFaq(btn) {
-  const item = btn.closest('.faq-item');
-  const answer = item.querySelector('.faq-answer');
-  const arrow = btn.querySelector('.faq-arrow');
-  const isOpen = answer.classList.contains('open');
-  // Close all
-  document.querySelectorAll('.faq-answer.open').forEach(a => {
-    a.classList.remove('open');
-    a.previousElementSibling?.querySelector('.faq-arrow')?.classList.remove('open');
-  });
-  if (!isOpen) {
-    answer.classList.add('open');
-    arrow.classList.add('open');
-  }
-}
+    function animateCounter(id, target) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const duration = 1800;
+      const step = target / (duration / 16);
+      let current = 0;
+      const timer = setInterval(() => {
+        current = Math.min(current + step, target);
+        el.textContent = Math.round(current).toLocaleString('en-IN');
+        if (current >= target) {
+          clearInterval(timer);
+          el.textContent = target > 0 ? Math.round(target).toLocaleString('en-IN') : '—';
+        }
+      }, 16);
+    }
 
-loadLiveStats();
-</script>
+    // Modern FAQ Accordion Transition
+    document.querySelectorAll('.faq-question').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const answer = btn.nextElementSibling;
+        const arrow = btn.querySelector('.faq-arrow');
+        const isOpen = answer.classList.contains('open');
 
+        // Close all others
+        document.querySelectorAll('.faq-answer.open').forEach(ans => {
+          ans.classList.remove('open');
+          ans.previousElementSibling.querySelector('.faq-arrow').classList.remove('open');
+        });
+
+        if (!isOpen) {
+          answer.classList.add('open');
+          arrow.classList.add('open');
+        }
+      });
+    });
+
+    loadLiveStats();
+  </script>
+
+<script src="{{ url_for('static', filename='js/clickspark.js') }}"></script>
 </body>
 </html>

@@ -615,3 +615,129 @@ def get_company_reputation_stats(company_name="", domain="", listing_url=""):
         print(f"[warn] Failed to query scam_reports stats: {e}")
 
     return company_count, domain_count, listing_count
+
+
+# In-memory fallbacks if Supabase is offline or tables do not exist
+_fallback_sessions = {}
+_fallback_messages = {}
+
+def create_chat_session(user_id, title="New Conversation"):
+    import uuid
+    from datetime import datetime
+    session_id = str(uuid.uuid4())
+    now_str = datetime.utcnow().isoformat()
+    
+    if supabase:
+        try:
+            resp = supabase.table("ai_chat_sessions").insert({
+                "user_id": user_id,
+                "title": title
+            }).execute()
+            if resp.data:
+                return resp.data[0]
+        except Exception as e:
+            print(f"[warn] Failed to create_chat_session in Supabase: {e}. Falling back to memory.")
+            
+    sess = {
+        "id": session_id,
+        "user_id": user_id,
+        "title": title,
+        "created_at": now_str,
+        "updated_at": now_str
+    }
+    _fallback_sessions[session_id] = sess
+    _fallback_messages[session_id] = []
+    return sess
+
+def get_chat_sessions(user_id):
+    if supabase:
+        try:
+            resp = supabase.table("ai_chat_sessions")\
+                           .select("*")\
+                           .eq("user_id", user_id)\
+                           .order("updated_at", desc=True)\
+                           .execute()
+            if resp.data is not None:
+                return resp.data
+        except Exception as e:
+            print(f"[warn] Failed to get_chat_sessions from Supabase: {e}. Falling back to memory.")
+            
+    return sorted(
+        [s for s in _fallback_sessions.values() if s["user_id"] == user_id],
+        key=lambda x: x["updated_at"],
+        reverse=True
+    )
+
+def delete_chat_session(session_id):
+    if supabase:
+        try:
+            supabase.table("ai_chat_sessions")\
+                           .delete()\
+                           .eq("id", session_id)\
+                           .execute()
+            return True
+        except Exception as e:
+            print(f"[warn] Failed to delete_chat_session in Supabase: {e}. Falling back to memory.")
+            
+    if session_id in _fallback_sessions:
+        del _fallback_sessions[session_id]
+    if session_id in _fallback_messages:
+        del _fallback_messages[session_id]
+    return True
+
+def save_chat_message(session_id, role, content, documents=None):
+    from datetime import datetime
+    now_str = datetime.utcnow().isoformat()
+    msg_data = {
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+        "documents": documents or []
+    }
+    if supabase:
+        try:
+            resp = supabase.table("ai_chat_messages").insert(msg_data).execute()
+            try:
+                supabase.table("ai_chat_sessions")\
+                        .update({"updated_at": now_str})\
+                        .eq("id", session_id)\
+                        .execute()
+            except Exception:
+                pass
+            if resp.data:
+                return resp.data[0]
+        except Exception as e:
+            print(f"[warn] Failed to save_chat_message in Supabase: {e}. Falling back to memory.")
+            
+    import uuid
+    fallback_msg = {
+        "id": str(uuid.uuid4()),
+        "session_id": session_id,
+        "role": role,
+        "content": content,
+        "documents": documents or [],
+        "created_at": now_str
+    }
+    if session_id not in _fallback_messages:
+        _fallback_messages[session_id] = []
+    _fallback_messages[session_id].append(fallback_msg)
+    
+    if session_id in _fallback_sessions:
+        _fallback_sessions[session_id]["updated_at"] = now_str
+        
+    return fallback_msg
+
+def get_chat_messages(session_id):
+    if supabase:
+        try:
+            resp = supabase.table("ai_chat_messages")\
+                           .select("*")\
+                           .eq("session_id", session_id)\
+                           .order("created_at", desc=False)\
+                           .execute()
+            if resp.data is not None:
+                return resp.data
+        except Exception as e:
+            print(f"[warn] Failed to get_chat_messages from Supabase: {e}. Falling back to memory.")
+            
+    return _fallback_messages.get(session_id, [])
