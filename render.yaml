@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: scamshield
+    runtime: python
+    pythonVersion: "3.11"
+    buildCommand: |
+      apt-get install -y poppler-utils tesseract-ocr libgl1 || true
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: gunicorn "scam_detector.app:app" --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --log-level info
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: "10000"
