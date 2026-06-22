@@ -1,23 +1,13 @@
 # =====================================================
-# ScamShield v3.0 Production Requirements (Python 3.11)
-# =====================================================
-#
-# DEPLOYMENT TARGET: Render (Flask + Gunicorn)
-# DATABASE:          Supabase
-# MODELS:            Sklearn, XGBoost, Naive Bayes (local)
-#
+# ScamShield Production Requirements (Python 3.11)
 # =====================================================
 
-# ─────────────────────────────────────────────────────
-# PHASE 1: Web Framework & Deployment
-# ─────────────────────────────────────────────────────
+# Web Framework & Deployment
 flask==3.0.3
 gunicorn==21.2.0
 werkzeug==3.0.0
 
-# ─────────────────────────────────────────────────────
-# PHASE 2: Machine Learning & Data Science
-# ─────────────────────────────────────────────────────
+# Machine Learning & Data Science
 scikit-learn==1.4.2
 xgboost==2.0.3
 numpy==1.26.4
@@ -26,14 +16,10 @@ scipy==1.14.1
 joblib==1.4.2
 openpyxl==3.1.5
 
-# ─────────────────────────────────────────────────────
-# PHASE 3: Domain Intelligence
-# ─────────────────────────────────────────────────────
+# Domain Intelligence
 python-whois==0.9.6
 
-# ─────────────────────────────────────────────────────
-# PHASE 4: PDF Processing
-# ─────────────────────────────────────────────────────
+# PDF Processing
 pdfplumber==0.10.3
 PyMuPDF==1.23.8
 pdf2image==1.16.3
@@ -41,29 +27,15 @@ pytesseract==0.3.10
 Pillow==10.1.0
 reportlab==4.2.5
 
-# ─────────────────────────────────────────────────────
-# PHASE 5: Web Scraping
-# ─────────────────────────────────────────────────────
+# Web Scraping & Utilities
 requests==2.31.0
 beautifulsoup4==4.12.3
+urllib3<2.0.0
+tenacity==8.3.0
 
-# ─────────────────────────────────────────────────────
-# PHASE 6: Database & Auth
-# ─────────────────────────────────────────────────────
+# Database & Authentication
 supabase==2.4.0
 python-dotenv==1.0.1
 
-# ─────────────────────────────────────────────────────
-# PHASE 7: NLP Text Processing
-# ─────────────────────────────────────────────────────
+# NLP Text Processing
 nltk==3.8.1
-
-# ─────────────────────────────────────────────────────
-# NOTES
-# ─────────────────────────────────────────────────────
-# REMOVED:
-#   groq          — replaced by local explanation engine
-#   sentence-transformers / torch / shap — heavy, not needed
-#   playwright    — optional scraper dep, add back if needed
-#   matplotlib / seaborn / tqdm — dev/analysis only
-# ─────────────────────────────────────────────────────

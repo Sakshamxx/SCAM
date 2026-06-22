@@ -5,7 +5,8 @@
 # Double-click this file to start the project
 # ─────────────────────────────────────────────
 
-PROJECT_DIR="/Users/sakshamchauhan/Desktop/Team-j_Fake-Internship-Job-Scam-Detection-System"
+# Resolve project directory dynamically from the script location
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VENV_PYTHON="$PROJECT_DIR/.venv/bin/python"
 APP_PATH="$PROJECT_DIR/scam_detector/app.py"
 
@@ -20,7 +21,6 @@ echo ""
 if [ ! -d "$PROJECT_DIR" ]; then
     echo "❌ Project folder not found at:"
     echo "   $PROJECT_DIR"
-    echo "   Update PROJECT_DIR in this script."
     read -p "Press Enter to exit..."
     exit 1
 fi

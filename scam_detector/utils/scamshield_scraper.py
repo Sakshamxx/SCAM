@@ -89,11 +89,24 @@ except ImportError:
     logging.warning("playwright not installed — Playwright scrapers disabled.")
 
 # ── Misc ─────────────────────────────────────────────────────────────────────
-from rich.console import Console
-from rich.table import Table
-from rich import print as rprint
+try:
+    from rich.console import Console
+    from rich.table import Table
+    from rich import print as rprint
+    console = Console()
+except ImportError:
+    class MockConsole:
+        def print(self, *args, **kwargs):
+            print(*args)
+        def rule(self, *args, **kwargs):
+            print("=" * 55)
+    console = MockConsole()
+    class Table:
+        def __init__(self, *args, **kwargs): pass
+        def add_column(self, *args, **kwargs): pass
+        def add_row(self, *args, **kwargs): pass
+    rprint = print
 
-console = Console()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("ScamShield.Scraper")
 
