@@ -16,13 +16,14 @@ import requests
 from pathlib import Path
 # pyrefly: ignore [missing-import]
 from bs4 import BeautifulSoup
-from supabase_client import (
+from database.supabase_client import (
     supabase, save_analysis, get_history, log_activity, get_activity_logs,
     get_all_users, get_all_analyses, get_user_analyses,
     get_blacklisted_domain, save_scam_report, get_scam_reports,
     get_platform_stats, get_recent_scam_reports_public,
     save_evidence_file, get_evidence_for_report
 )
+from rule_engine.rules import keyword_fraud_score, check_salary_anomaly, get_user_report_score, FRAUD_KEYWORDS
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from reportlab.lib.pagesizes import A4
@@ -31,11 +32,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
-try:
-    from groq import Groq as GroqClient
-    _groq_available = True
-except ImportError:
-    _groq_available = False
+# Groq removed — using local explanation engine
+_groq_available = False
 
 # ── New extraction utilities ─────────────────────────────────────────────────
 try:
@@ -64,7 +62,7 @@ except Exception as _e:
     print(f'[warn] HTML cleaner not available: {_e}')
 
 try:
-    from utils.domain_intelligence import (
+    from domain_intel.domain_intelligence import (
         compute_domain_intelligence_score,
         get_domain_intelligence_details,
         extract_domain
@@ -97,9 +95,10 @@ except Exception as _ss_err:
 
 # Try to import sentence-transformers for semantic embeddings
 try:
+    # pyrefly: ignore [missing-import]
     from sentence_transformers import SentenceTransformer
     _semantic_available = True
-except ImportError:
+except Exception:
     _semantic_available = False
 
 app = Flask(__name__)
@@ -116,30 +115,24 @@ BASE_DIR = Path(__file__).parent
 MODEL_DIR = BASE_DIR / 'models'
 
 # ─────────────────────────────────────────────
-# Groq AI Explanation Layer
+# Local Explanation Engine (replaces Groq AI)
 # ─────────────────────────────────────────────
-_groq_client = None
 
-def _get_groq_client():
-    """Lazy-load Groq client; return None if unavailable."""
-    global _groq_client
-    if not _groq_available:
-        return None
-    if _groq_client is None:
-        api_key = os.getenv("GROQ_API_KEY", "").strip()
-        if api_key:
-            try:
-                _groq_client = GroqClient(api_key=api_key)
-            except Exception as e:
-                print("Groq client init error:", e)
-    return _groq_client
+def get_local_fallback_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords,
+                                   job_title='', company='', details=None):
+    """Local rule-based explanation engine (no external API needed)."""
+    details = details or {}
+    kw_list = ', '.join(matched_keywords[:3]) if matched_keywords else 'none detected'
+    ml_score  = details.get('ml_model_score', 0)
+    nlp_score = details.get('nlp_model_score', 0)
+    domain_score = details.get('domain_intelligence_score', details.get('domain_score', 0))
 
-
-def get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords,
-                                  job_title='', company='', details=None):
-    """Generate fallback explanation if Groq unavailable."""
     if risk_level == 'Scam':
-        explanation = f"This job listing for '{job_title}' at '{company}' exhibits high-risk indicators, with a risk score of {risk_score}/100. Specific anomalies such as flagged keywords ({', '.join(matched_keywords[:3]) if matched_keywords else 'none detected'}) warrant extreme caution."
+        explanation = (
+            f"This job listing for '{job_title}' at '{company}' has been flagged with a high risk score of "
+            f"{risk_score}/100. Our ML model ({ml_score:.0f}/100) and NLP text classifier ({nlp_score:.0f}/100) "
+            f"both detected strong indicators of fraud. Suspicious phrases identified: {kw_list}."
+        )
         recruiter_assessment = "The recruiter credentials and contact methods match patterns commonly associated with employment scams."
         safety_advice = "DO NOT pay any fees or share sensitive personal documents (PAN/Aadhaar) with this recruiter."
         recommendations = [
@@ -149,7 +142,11 @@ def get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags,
             "Refuse any requests for upfront bank account details or identity documents."
         ]
     elif risk_level == 'Suspicious':
-        explanation = f"The job listing for '{job_title}' at '{company}' has a moderate risk score of {risk_score}/100. While not definitively fraudulent, it contains suspicious phrases or contact channels that require validation."
+        explanation = (
+            f"The job listing for '{job_title}' at '{company}' has a moderate risk score of {risk_score}/100. "
+            f"ML signals ({ml_score:.0f}/100) and NLP analysis ({nlp_score:.0f}/100) show mixed indicators. "
+            f"While not definitively fraudulent, it contains suspicious phrases requiring validation."
+        )
         recruiter_assessment = "The recruiter signals are mixed, showing unverified email domains or non-standard application procedures."
         safety_advice = "Verify the job posting and company credentials before continuing with the application."
         recommendations = [
@@ -158,7 +155,11 @@ def get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags,
             "Do not participate in instant hiring decisions without a formal interview process."
         ]
     else:
-        explanation = f"The job listing for '{job_title}' at '{company}' displays very few risk indicators, scoring {risk_score}/100. The text pattern aligns with standard, legitimate hiring practices."
+        explanation = (
+            f"The job listing for '{job_title}' at '{company}' displays very few risk indicators, scoring {risk_score}/100. "
+            f"ML analysis ({ml_score:.0f}/100) and NLP classifier ({nlp_score:.0f}/100) both indicate this "
+            f"aligns with standard, legitimate hiring practices."
+        )
         recruiter_assessment = "The hiring contact signals appear consistent with standard corporate recruiting practices."
         safety_advice = "This job appears to be safe, but always verify before sharing personal information."
         recommendations = [
@@ -166,7 +167,7 @@ def get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags,
             "Keep all communication within secure and official channels.",
             "Read the job contract carefully before accepting the offer."
         ]
-        
+
     return {
         "explanation": explanation,
         "recommendations": recommendations,
@@ -176,54 +177,17 @@ def get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags,
     }
 
 
-def get_groq_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords,
-                         job_title='', company='', details=None):
-    """Call Groq LLM to generate explanation. ML model is source of truth."""
-    client = _get_groq_client()
-    if client is None:
-        return get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords, job_title, company, details)
+def get_local_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords,
+                          job_title='', company='', details=None):
+    """Primary explanation function — uses local engine (no external API)."""
+    return get_local_fallback_explanation(
+        risk_score, risk_level, risk_label, red_flags, matched_keywords,
+        job_title, company, details
+    )
 
-    details = details or {}
-    kw_list = ', '.join(matched_keywords[:6]) if matched_keywords else 'None detected'
-    flags_list = '\n'.join(f'- {f}' for f in red_flags) if red_flags else '- No major red flags'
-
-    prompt = f"""You are ScamShield AI, an employment fraud intelligence assistant for Indian students.
-
-A job posting has been analyzed by our ML fraud detection engine. Your role is ONLY to explain the results — do NOT change or override the classification.
-
-Job Details:
-- Title: {job_title or 'Unknown'}
-- Company: {company or 'Unknown'}
-- Risk Score: {risk_score}/100
-- Risk Level: {risk_level}
-- Verdict: {risk_label}
-- Detected Scam Keywords: {kw_list}
-- Red Flags:
-{flags_list}
-
-Provide your response as a JSON object with exactly these 4 keys:
-1. "explanation": A 2-3 sentence plain-English explanation of WHY this job was flagged or deemed safe.
-2. "recommendations": A list of 3-4 specific safety recommendations.
-3. "safety_advice": One sentence of overall safety guidance.
-4. "recruiter_assessment": A brief 1-sentence assessment of recruiter trustworthiness.
-
-Respond ONLY with valid JSON. No extra text."""
-
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=600,
-        )
-        raw = response.choices[0].message.content.strip()
-        if '```' in raw:
-            raw = re.sub(r'```(?:json)?', '', raw).replace('```', '').strip()
-        import json
-        return json.loads(raw)
-    except Exception as e:
-        print("Groq explanation error:", e)
-        return get_groq_fallback_explanation(risk_score, risk_level, risk_label, red_flags, matched_keywords, job_title, company, details)
+# Backward compatibility aliases
+get_groq_fallback_explanation = get_local_fallback_explanation
+get_groq_explanation = get_local_explanation
 
 
 
@@ -237,71 +201,201 @@ def load_model(filename):
             print(f"[warn] Failed to load {filename}: {e}")
     return None
 
-# Load production models from train_nlp_models.py
-nlp_pipeline = load_model('nlp_pipeline.pkl')
-logistic_model = load_model('logistic_model.pkl')
-scaler = load_model('scaler.pkl')
-le_location = load_model('le_location.pkl')
-le_title = load_model('le_title.pkl')
+# ─────────────────────────────────────────────
+# Load New Trained Models (train_and_export_models.py)
+# ─────────────────────────────────────────────
+import pickle
 
-# Set other model placeholders to None to ensure compatibility and prevent loading
-random_forest_model = None
-xgboost_model = None
-tfidf_vectorizer = None
+def _load_pickle(name):
+    """Load a pickle file from models directory."""
+    path = MODEL_DIR / name
+    if path.exists():
+        try:
+            with open(path, 'rb') as f:
+                return pickle.load(f)
+        except Exception as e:
+            print(f"[warn] Failed to load {name}: {e}")
+    return None
 
-# Encoders aliases for backwards compatibility
+# Primary models: trained via assets/train_and_export_models.py
+nlp_model       = _load_pickle('nlp_model.pkl')          # Naive Bayes NLP model (TF-IDF only)
+ml_model        = _load_pickle('ml_model.pkl')           # Best ML model (LR/RF/XGB on full features)
+tfidf_vec       = _load_pickle('tfidf_vectorizer.pkl')   # TF-IDF vectorizer
+trigram_vec     = _load_pickle('trigram_vectorizer.pkl') # Trigram vectorizer
+label_encoder   = _load_pickle('label_encoder.pkl')      # Label encoder (Legit/Scam/Suspicious)
+feature_config  = _load_pickle('feature_config.pkl')     # Feature config & fraud keywords
+
+# Legacy model aliases for backward compatibility with other routes
+nlp_pipeline    = _load_pickle('nlp_pipeline.pkl')   # old pipeline (may not exist)
+logistic_model  = _load_pickle('logistic_model.pkl') # old logistic model
+scaler          = _load_pickle('scaler.pkl')          # old scaler
+le_location     = _load_pickle('le_location.pkl')
+le_title        = _load_pickle('le_title.pkl')
+
+# Backward compat aliases
 nlp_le_location = le_location
 nlp_le_title = le_title
+random_forest_model = None
+xgboost_model = None
+tfidf_vectorizer = tfidf_vec
 
-# ── Secondary ML pipeline from job_scam_detection.ipynb ─────────────────────
-# Uses best_model.pkl + tfidf_vectorizer.pkl + scaler.pkl + sentence_transformer.pkl
+# Notebook pipeline disabled — replaced by new models
 _notebook_pipeline = None
-try:
-    import sys
-    from models.inference import JobScamInferencePipeline, DenseTransformer
-    sys.modules['__main__'].DenseTransformer = DenseTransformer
 
-    _best_model   = load_model('best_model.pkl')
-    _tfidf_vec    = load_model('tfidf_vectorizer.pkl')
-    _nb_scaler    = load_model('scaler.pkl')          # shared scaler
-    
-    _sent_trans = None
+# Load feature config fraud keywords if available
+if feature_config and 'fraud_keywords' in feature_config:
+    _feature_config_keywords = feature_config['fraud_keywords']
+else:
+    _feature_config_keywords = []
+
+print("\n" + "=" * 55)
+print("ScamShield v3.0 — Hybrid Model Status")
+print("=" * 55)
+print(f"NLP Model (Naive Bayes):    {'✅ Loaded' if nlp_model else '❌ Missing'}")
+print(f"ML Model (Best Ensemble):   {'✅ Loaded' if ml_model else '❌ Missing'}")
+print(f"TF-IDF Vectorizer:          {'✅ Loaded' if tfidf_vec else '❌ Missing'}")
+print(f"Trigram Vectorizer:         {'✅ Loaded' if trigram_vec else '❌ Missing'}")
+print(f"Label Encoder:              {'✅ Loaded' if label_encoder else '❌ Missing'}")
+print(f"Feature Config:             {'✅ Loaded' if feature_config else '❌ Missing'}")
+print(f"Legacy NLP Pipeline:        {'✅ Loaded' if nlp_pipeline else '⚠ Not found (using new model)'}")
+print("=" * 55 + "\n")
+
+
+# ─────────────────────────────────────────────
+# New Model Inference Helpers
+# ─────────────────────────────────────────────
+STOPWORDS_SET = {
+    'the','a','an','and','or','but','in','on','at','to','for','of','is','it',
+    'this','that','be','as','by','with','are','was','were','has','have','will',
+    'from','we','our','you','your','their','its','not','no','can','about',
+    'also','any','all','more','than','they','us','do','does','did','been',
+    'if','then','so','such','each','per','should','may','would','could','when',
+    'into','out','up','down','day','time','make','new','use','get','work'
+}
+
+def clean_text_for_model(text):
+    """Clean text to match training preprocessing."""
+    text = str(text).lower()
+    text = re.sub(r'http\S+|www\S+', ' url ', text)
+    text = re.sub(r'[^a-z0-9\s]', ' ', text)
+    text = re.sub(r'\d+', ' num ', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    tokens = [w for w in text.split() if w not in STOPWORDS_SET and len(w) > 2]
+    return ' '.join(tokens)
+
+
+def run_new_model_inference(job_text, job_title='', skills=''):
+    """
+    Run inference using the new trained NLP model and ML model.
+
+    Feature layout trained in train_and_export_models.py:
+        NLP model  (MultinomialNB)     : X_tfidf only          → 8 000 features
+        ML  model  (LR/RF/XGB)         : X_tfidf + X_tri + X_struct → 8000+3000+28 = 11 028 features
+
+    Returns:
+        nlp_score (0-100): NLP model scam probability score
+        ml_score  (0-100): ML  model scam probability score
+    """
+    nlp_score = 0.0
+    ml_score  = 0.0
+
+    combined = (
+        clean_text_for_model(job_title) + ' ' +
+        clean_text_for_model(job_text)  + ' ' +
+        clean_text_for_model(skills)
+    ).strip()
+
+    if not combined or not tfidf_vec:
+        print('[inference] Skipping — empty text or missing tfidf_vec')
+        return nlp_score, ml_score
+
     try:
-        _sent_trans = load_model('sentence_transformer.pkl')
+        from scipy.sparse import hstack, csr_matrix
+        import numpy as np
+
+        X_tfidf = tfidf_vec.transform([combined])
+        print(f'[inference] X_tfidf shape: {X_tfidf.shape}')
+
+        # ── NLP MODEL: MultinomialNB on TF-IDF only ──────────────────────────
+        if nlp_model is not None:
+            print(f'[inference] nlp_model type: {type(nlp_model).__name__}')
+            nlp_proba = nlp_model.predict_proba(X_tfidf)[0]
+            print(f'[inference] nlp_proba: {nlp_proba}  classes_: {nlp_model.classes_}')
+
+            # classes_ is numpy array of ints [0, 1, 2] where label_encoder maps:
+            #   0 = Legit, 1 = Scam, 2 = Suspicious
+            classes_list = nlp_model.classes_.tolist()   # plain Python ints
+            scam_idx = classes_list.index(1) if 1 in classes_list else -1
+            susp_idx = classes_list.index(2) if 2 in classes_list else -1
+            scam_prob = float(nlp_proba[scam_idx]) if scam_idx >= 0 else 0.0
+            susp_prob = float(nlp_proba[susp_idx]) if susp_idx >= 0 else 0.0
+            nlp_score = round(min(100.0, scam_prob * 100.0 + susp_prob * 50.0), 1)
+            print(f'[inference] nlp_score: {nlp_score}  (scam_prob={scam_prob:.4f}, susp_prob={susp_prob:.4f})')
+
+        # ── ML MODEL: LR/RF/XGB on TF-IDF + Trigram + Struct-zeros ──────────
+        # The ML model expects 8000 (tfidf) + 3000 (trigram) + 28 (struct) = 11 028 features.
+        # At inference time we have no structured input, so pad struct with zeros.
+        if ml_model is not None and trigram_vec is not None:
+            print(f'[inference] ml_model type: {type(ml_model).__name__}, '
+                  f'n_features_in_: {getattr(ml_model, "n_features_in_", "?")}')
+
+            X_tri = trigram_vec.transform([combined])
+            print(f'[inference] X_tri shape: {X_tri.shape}')
+
+            # Determine how many struct features to pad
+            n_tfidf   = X_tfidf.shape[1]
+            n_tri     = X_tri.shape[1]
+            n_ml_exp  = getattr(ml_model, 'n_features_in_', n_tfidf + n_tri)
+            n_struct  = n_ml_exp - n_tfidf - n_tri          # 11028 - 8000 - 3000 = 28
+
+            if n_struct < 0:
+                # Fallback: ML model trained on tfidf+trigram only
+                n_struct = 0
+
+            if n_struct > 0:
+                X_struct_zeros = csr_matrix(np.zeros((1, n_struct)))
+                X_full = hstack([X_tfidf, X_tri, X_struct_zeros])
+            else:
+                X_full = hstack([X_tfidf, X_tri])
+
+            print(f'[inference] X_full shape: {X_full.shape}  (n_struct_pad={n_struct})')
+
+            ml_proba = ml_model.predict_proba(X_full)[0]
+            print(f'[inference] ml_proba: {ml_proba}  classes_: {ml_model.classes_}')
+
+            classes_list = ml_model.classes_.tolist()
+            scam_idx = classes_list.index(1) if 1 in classes_list else -1
+            susp_idx = classes_list.index(2) if 2 in classes_list else -1
+            scam_prob = float(ml_proba[scam_idx]) if scam_idx >= 0 else 0.0
+            susp_prob = float(ml_proba[susp_idx]) if susp_idx >= 0 else 0.0
+            ml_score = round(min(100.0, scam_prob * 100.0 + susp_prob * 50.0), 1)
+            print(f'[inference] ml_score:  {ml_score}  (scam_prob={scam_prob:.4f}, susp_prob={susp_prob:.4f})')
+
+        elif ml_model is not None:
+            # ML model with tfidf only (no trigram vectorizer)
+            print('[inference] Warning: trigram_vec missing, running ml_model on tfidf only')
+            n_ml_exp = getattr(ml_model, 'n_features_in_', X_tfidf.shape[1])
+            n_pad    = n_ml_exp - X_tfidf.shape[1]
+            if n_pad > 0:
+                X_full = hstack([X_tfidf, csr_matrix(np.zeros((1, n_pad)))])
+            else:
+                X_full = X_tfidf
+            ml_proba   = ml_model.predict_proba(X_full)[0]
+            classes_list = ml_model.classes_.tolist()
+            scam_idx = classes_list.index(1) if 1 in classes_list else -1
+            susp_idx = classes_list.index(2) if 2 in classes_list else -1
+            scam_prob = float(ml_proba[scam_idx]) if scam_idx >= 0 else 0.0
+            susp_prob = float(ml_proba[susp_idx]) if susp_idx >= 0 else 0.0
+            ml_score  = round(min(100.0, scam_prob * 100.0 + susp_prob * 50.0), 1)
+
     except Exception as e:
-        print(f"[info] Loading sentence_transformer.pkl failed, trying standard initialization: {e}")
-        
-    if not _sent_trans and _semantic_available:
-        try:
-            _sent_trans = SentenceTransformer('all-MiniLM-L6-v2')
-            print("[info] Loaded standard SentenceTransformer ('all-MiniLM-L6-v2') successfully ✅")
-        except Exception as e:
-            print(f"[warn] Failed to load standard SentenceTransformer: {e}")
+        import traceback
+        print(f'[inference] ERROR in run_new_model_inference: {e}')
+        traceback.print_exc()
 
-    if _best_model and _tfidf_vec and _nb_scaler and _sent_trans:
-        _notebook_pipeline = JobScamInferencePipeline(
-            model=_best_model,
-            tfidf_vec=_tfidf_vec,
-            st_model=_sent_trans,
-            scaler=_nb_scaler,
-        )
-        print('[info] models/inference.py JobScamInferencePipeline loaded ✅')
-    else:
-        print('[warn] One or more notebook model files missing — secondary pipeline disabled')
-except Exception as _nb_err:
-    print(f'[warn] models/inference.py load failed: {_nb_err}')
+    print(f'[inference] Final scores → nlp_score={nlp_score}, ml_score={ml_score}')
+    return nlp_score, ml_score
 
-print("\n" + "=" * 50)
-print("ScamShield v2.0 — Model Status")
-print("=" * 50)
-print(f"NLP Pipeline:           {'✅ Loaded' if nlp_pipeline else '❌ Missing'}")
-print(f"Logistic Model:         {'✅ Loaded' if logistic_model else '❌ Missing'}")
-print(f"Random Forest:          {'✅ Loaded' if random_forest_model else '❌ Missing'}")
-print(f"Scaler:                 {'✅ Loaded' if scaler else '❌ Missing'}")
-print(f"LE Location:            {'✅ Loaded' if le_location else '❌ Missing'}")
-print(f"LE Title:               {'✅ Loaded' if le_title else '❌ Missing'}")
-print(f"Notebook Pipeline:      {'✅ Loaded' if _notebook_pipeline else '❌ Missing/Unavailable'}")
-print("=" * 50 + "\n")
 
 
 def normalize_text(text_val):
@@ -333,19 +427,32 @@ def parse_salary(val):
 
 
 def safe_encode(le, val, default_val='Unknown'):
+    """Safely encode a value using a sklearn LabelEncoder.
+
+    Guards against None and against objects that aren't real
+    LabelEncoders (e.g. numpy arrays loaded from stale pkl files).
+    """
     if le is None:
         return 0
+    # Hard type-check: must have classes_ as an attribute of a proper encoder
+    if not hasattr(le, 'classes_') or not hasattr(le, 'transform'):
+        print(f'[safe_encode] WARNING: le is {type(le).__name__}, not a LabelEncoder — returning 0')
+        return 0
     val_clean = str(val).strip()
-    if val_clean in le.classes_:
-        return int(le.transform([val_clean])[0])
-    # Case-insensitive check
-    val_lower = val_clean.lower()
-    for idx, c in enumerate(le.classes_):
-        if str(c).lower().strip() == val_lower:
-            return idx
-    # Fallback to default_val if it exists in classes
-    if default_val in le.classes_:
-        return int(le.transform([default_val])[0])
+    try:
+        classes = le.classes_.tolist() if hasattr(le.classes_, 'tolist') else list(le.classes_)
+        if val_clean in classes:
+            return int(le.transform([val_clean])[0])
+        # Case-insensitive check
+        val_lower = val_clean.lower()
+        for idx, c in enumerate(classes):
+            if str(c).lower().strip() == val_lower:
+                return idx
+        # Fallback to default_val
+        if default_val in classes:
+            return int(le.transform([default_val])[0])
+    except Exception as _se_err:
+        print(f'[safe_encode] ERROR encoding "{val}": {_se_err}')
     return 0
 
 # Load semantic model (if available)
@@ -359,53 +466,8 @@ if _semantic_available:
         print(f"[warn] Failed to load semantic model: {e}")
 
 # ─────────────────────────────────────────────
-# Fraud Keywords Dictionary
-# ─────────────────────────────────────────────
-FRAUD_KEYWORDS = {
-    # Very High risk (0.90 – 1.00)
-    'registration fee': 0.95,
-    'joining fee': 0.95,
-    'training fee': 0.93,
-    'deposit required': 0.92,
-    'whatsapp hr': 0.91,
-    'pay to join': 0.91,
-    'earn from home': 0.90,
-    'guaranteed income': 0.90,
-    'instant joining': 0.82,
-
-    # High risk (0.70 – 0.89)
-    'earn daily': 0.85,
-    'no experience required': 0.80,
-    'no qualification needed': 0.80,
-    'daily payment': 0.80,
-    'no interview': 0.75,
-    'urgent hiring': 0.74,
-    'limited seats': 0.69,
-
-    # Medium risk (0.40 – 0.69)
-    'work only 1 hour': 0.65,
-    'work from comfort': 0.55,
-    'payment guaranteed': 0.52,
-    'telegram': 0.40,
-}
-
-# ─────────────────────────────────────────────
 # Helper Functions
 # ─────────────────────────────────────────────
-
-def keyword_fraud_score(text):
-    """Return 0–100 keyword-based fraud score and matched keywords."""
-    text_lower = str(text).lower()
-    total_weight = 0.0
-    matched = {}
-    for kw, weight in FRAUD_KEYWORDS.items():
-        if kw in text_lower:
-            total_weight += weight
-            matched[kw] = weight
-    max_possible = sum(FRAUD_KEYWORDS.values())
-    score = min(100, (total_weight / max_possible) * 100 * 3) if max_possible > 0 else 0
-    return round(score, 2), sorted(matched.items(), key=lambda x: -x[1])
-
 
 def check_domain_risk(url):
     """Assign domain risk (0–100) based on URL patterns."""
@@ -451,7 +513,7 @@ def check_domain_risk(url):
 def _persist_domain_reputation(result, url_input=''):
     """Save domain reputation to Supabase after verify_domain()."""
     try:
-        from supabase_client import save_domain_reputation
+        from database.supabase_client import save_domain_reputation
         raw = (url_input or result.get('url', '')).strip()
         if not raw:
             return
@@ -476,110 +538,65 @@ def _persist_domain_reputation(result, url_input=''):
         print(f"[warn] domain_reputation save: {_dr_err}")
 
 
-def check_salary_anomaly(avg_salary):
-    """Return salary anomaly score (0–100). Very high salary = suspicious."""
-    if avg_salary is None or avg_salary == '' or avg_salary == 0:
-        return 30.0
-    try:
-        sal = float(avg_salary)
-    except (ValueError, TypeError):
-        return 30.0
-
-    if sal > 100000:    return 85.0
-    elif sal > 60000:   return 65.0
-    elif sal > 40000:   return 45.0
-    elif sal > 20000:   return 20.0
-    else:               return 10.0
-
-
-def get_user_report_score(company='', url=''):
-    """
-    Fetch number of community scam reports for this company/domain.
-    Returns a risk score 0-100 based on report count.
-    Falls back to 0 if Supabase unavailable.
-    """
-    try:
-        if not supabase:
-            return 0.0
-        report_score = 0.0
-        if company and company.strip() and company.lower() != 'unknown':
-            resp = supabase.table('scam_reports') \
-                .select('id') \
-                .ilike('company', f'%{company.strip()}%') \
-                .execute()
-            report_count = len(resp.data) if resp.data else 0
-            report_score = min(100, report_count * 20)
-        return float(report_score)
-    except Exception:
-        return 0.0
-
-
 def compute_risk_score(text, url='', avg_salary=None, company=''):
     """
     Compute risk score using HYBRID WEIGHTED SYSTEM (v3.0).
     
     Final Risk Score = (ML × 0.30) + (NLP × 0.30) + (Rule-Based × 0.30) + (Domain × 0.10)
-    
-    Components:
-    - ML Score: Traditional ML model predictions (0-100)
-    - NLP Score: Advanced NLP analysis (0-100)
-    - Rule-Based: Keyword fraud + Salary anomalies + User reports (0-100)
-    - Domain Intelligence: Domain age, SSL, TLD, free hosting (0-100)
-    
-    Returns (risk_score, risk_level, risk_label, details_dict)
 
-    Risk Levels:
-    - 0-30:   Legit
-    - 31-60:  Suspicious
-    - 61-100: Scam
+    Components:
+    - ML Score:         New ML ensemble model (0-100)
+    - NLP Score:        New Naive Bayes NLP model (0-100)
+    - Rule-Based:       Keyword fraud + Salary anomalies + User reports (0-100)
+    - Domain Intel:     WHOIS age, SSL, TLD, free hosting (0-100)
+
+    Returns (risk_score, risk_level, risk_label, details_dict)
     """
-    # 1. RULE-BASED COMPONENT (Keyword + Salary + User Reports)
+    # 1. RULE-BASED COMPONENT
     kw_score, matched_kw = keyword_fraud_score(text)
     salary_score = check_salary_anomaly(avg_salary)
     report_score = get_user_report_score(company, url)
-    
-    rule_based_score = (
+
+    rule_based_score = min(100.0, max(0.0,
         kw_score * 0.5 +
         salary_score * 0.3 +
         report_score * 0.2
-    )
-    rule_based_score = min(100.0, max(0.0, rule_based_score))
-    
-    # 2. NLP SCORE COMPONENT
-    nlp_score = 0.0
-    try:
-        if nlp_pipeline is not None:
+    ))
+
+    # 2. NLP + ML from new trained models
+    nlp_score, ml_score = run_new_model_inference(job_text=text, job_title='', skills='')
+
+    # Fallback: if models not available, use 50 (neutral)
+    if nlp_score == 0.0 and nlp_pipeline is not None:
+        try:
             proba = nlp_pipeline.predict_proba([str(text)])[0]
-            nlp_score = round((proba[1] * 50 + proba[2] * 100), 1)
-    except Exception:
-        nlp_score = 0.0
-    
-    nlp_score = min(100.0, max(0.0, nlp_score))
-    
-    # 3. ML SCORE COMPONENT
-    ml_score = 50.0  # Default neutral score
-    # Note: ML score is typically calculated in the /analyze endpoint using notebook pipeline
-    # For backward compatibility, we use NLP as proxy if ML not provided
-    
-    # 4. DOMAIN INTELLIGENCE COMPONENT
-    domain_score = 50.0  # Default neutral
+            nlp_score = round(min(100.0, proba[1] * 50 + proba[2] * 100), 1)
+        except Exception:
+            nlp_score = 50.0
+    elif nlp_score == 0.0:
+        nlp_score = 50.0  # neutral if models missing
+
+    if ml_score == 0.0:
+        ml_score = 50.0  # neutral if models missing
+
+    # 3. DOMAIN INTELLIGENCE COMPONENT
+    domain_score = 50.0
     domain_details = {}
     if _domain_intelligence_available and url:
         try:
             domain_score = compute_domain_intelligence_score(url)
             domain_details = get_domain_intelligence_details(url)
         except Exception as e:
-            print(f"[warn] Domain intelligence calculation failed: {e}")
+            print(f"[warn] Domain intelligence failed: {e}")
             domain_score = 50.0
-    
-    # FINAL WEIGHTED SCORE
-    final_score = (
-        (ml_score * 0.30) +
-        (nlp_score * 0.30) +
-        (rule_based_score * 0.30) +
-        (domain_score * 0.10)
-    )
-    risk_score = round(min(100, max(0, final_score)), 1)
+
+    # 4. FINAL WEIGHTED SCORE (30/30/30/10)
+    risk_score = round(min(100.0, max(0.0,
+        ml_score  * 0.30 +
+        nlp_score * 0.30 +
+        rule_based_score * 0.30 +
+        domain_score * 0.10
+    )), 1)
 
     if risk_score <= 30:
         risk_level = 'Legit'
@@ -599,6 +616,7 @@ def compute_risk_score(text, url='', avg_salary=None, company=''):
         'nlp_model_score': round(nlp_score, 1),
         'ml_model_score': round(ml_score, 1),
         'domain_score': round(domain_score, 1),
+        'domain_intelligence_score': round(domain_score, 1),
         'domain_risk_factors': domain_details.get('risk_factors', []),
         'matched_keywords': [k for k, v in matched_kw[:8]]
     }
@@ -939,7 +957,7 @@ def admin_page():
     }
 
     try:
-        from supabase_client import (
+        from database.supabase_client import (
             get_top_suspicious_companies,
             get_high_risk_domains,
             get_common_scam_keywords
@@ -1163,12 +1181,24 @@ def analyze():
         combined_text = f"{normalized_job} {normalized_description} {normalized_skills}"
 
         # Get NLP predictions and probabilities
+        print(f'[analyze] nlp_pipeline type: {type(nlp_pipeline).__name__ if nlp_pipeline is not None else "None"}')
+        print(f'[analyze] nlp_model type:    {type(nlp_model).__name__ if nlp_model is not None else "None"}')
+        print(f'[analyze] ml_model type:     {type(ml_model).__name__ if ml_model is not None else "None"}')
+        print(f'[analyze] tfidf_vec type:    {type(tfidf_vec).__name__ if tfidf_vec is not None else "None"}')
+        print(f'[analyze] trigram_vec type:  {type(trigram_vec).__name__ if trigram_vec is not None else "None"}')
+        print(f'[analyze] le_location type:  {type(le_location).__name__ if le_location is not None else "None"}')
+        print(f'[analyze] le_title type:     {type(le_title).__name__ if le_title is not None else "None"}')
         if nlp_pipeline is not None:
             try:
+                print(f'[analyze] Running nlp_pipeline.predict on combined_text len={len(combined_text)}')
                 nlp_pred = nlp_pipeline.predict([combined_text])[0]
+                print(f'[analyze] nlp_pred={nlp_pred} type={type(nlp_pred).__name__}')
                 nlp_proba = nlp_pipeline.predict_proba([combined_text])[0]
+                print(f'[analyze] nlp_proba={nlp_proba}')
             except Exception as e:
-                print(f"[warn] NLP pipeline prediction failed: {e}")
+                import traceback as _tb
+                print(f'[analyze] nlp_pipeline prediction failed:')
+                _tb.print_exc()
                 nlp_pred = 0
                 nlp_proba = np.array([1.0, 0.0, 0.0])
         else:
@@ -1206,78 +1236,68 @@ def analyze():
         loc_enc = safe_encode(le_location, location if location else 'Unknown', default_val='Unknown')
         title_enc = safe_encode(le_title, normalized_job, default_val='')
 
-        # Get structured predictions and probabilities
-        if logistic_model is not None and scaler is not None:
+        # ── Community reputation (compute FIRST — used in rule_based_score) ────
+        from database.supabase_client import get_company_reputation_stats, save_company_reputation_report
+        url_domain = ""
+        if url:
             try:
-                features_arr = np.array([[salary_numeric, experience_val, kw_count, desc_len, loc_enc, title_enc]])
-                scaled_features = scaler.transform(features_arr)
-                structured_pred = logistic_model.predict(scaled_features)[0]
-                structured_proba = logistic_model.predict_proba(scaled_features)[0]
-            except Exception as e:
-                print(f"[warn] Logistic model prediction failed: {e}")
-                structured_pred = 0
-                structured_proba = np.array([1.0, 0.0, 0.0])
-        else:
-            structured_pred = 0
-            structured_proba = np.array([1.0, 0.0, 0.0])
+                url_domain = urllib.parse.urlparse(url).netloc.replace('www.', '')
+            except Exception:
+                pass
+        company_count, domain_count, listing_count = get_company_reputation_stats(
+            company_name=company,
+            domain=url_domain,
+            listing_url=url
+        )
+        total_reports = max(company_count, domain_count, listing_count)
+        community_score = min(100.0, total_reports * 20.0)
 
-        # Combine predictions using Soft Voting (average probabilities)
-        combined_proba = (nlp_proba + structured_proba) / 2.0
+        # ── NEW MODEL INFERENCE ────────────────────────────────────────────────
+        # Use new trained NLP (Naive Bayes) + ML (best ensemble) models
+        nlp_score_component, ml_score_component = run_new_model_inference(
+            job_text=description,
+            job_title=job_title,
+            skills=skills
+        )
 
-        # Calculate primary ML score
-        ml_score = float(combined_proba[1] * 50 + combined_proba[2] * 100)
-
-        # Blend ML score with secondary notebook pipeline signal if available (70/30 blend)
-        if _notebook_pipeline is not None and combined_text.strip():
+        # Fallback: if new models not loaded, try legacy NLP pipeline
+        if nlp_score_component == 0.0 and nlp_pipeline is not None:
             try:
-                nb_result = _notebook_pipeline.predict({
-                    'Job': job_title,
-                    'Company': company,
-                    'Location': location,
-                    'Description': description,
-                    'Skills': skills,
-                    'Experience': str(data.get('experience', '')),
-                    'Education_Required': '',
-                    'Salary_Disclosed': 'Yes' if salary else 'No',
-                    'Description_Length': len(description),
-                    'Keyword_Score': kw_score,
-                })
-                nb_prob = float(nb_result.get('Scam Probability', 0.5))
-                nb_score = nb_prob * 100
-                ml_score = ml_score * 0.70 + nb_score * 0.30
-            except Exception as _nb_err:
-                print(f"[warn] Notebook pipeline prediction failed: {_nb_err}")
+                nlp_proba_legacy = nlp_pipeline.predict_proba([combined_text])[0]
+                nlp_score_component = round(min(100.0, nlp_proba_legacy[1] * 50 + nlp_proba_legacy[2] * 100), 1)
+            except Exception:
+                pass
 
-        # ── HYBRID WEIGHTED SYSTEM (v3.0) ──────────────────────────────────────
-        # Components:
-        # 1. ML Score (30%): Traditional ML model predictions
-        # 2. NLP Score (30%): Advanced NLP analysis  
-        # 3. Rule-Based Score (30%): Keyword + Salary + Community reports
-        # 4. Domain Intelligence (10%): Domain age, SSL, TLD, free hosting
-        
-        # Extract NLP score for separate tracking
-        nlp_score_component = 0.0
-        try:
-            if nlp_pipeline is not None:
-                nlp_proba = nlp_pipeline.predict_proba([str(combined_text)])[0]
-                nlp_score_component = round((nlp_proba[1] * 50 + nlp_proba[2] * 100), 1)
-        except Exception:
-            nlp_score_component = 0.0
-        
-        nlp_score_component = min(100.0, max(0.0, nlp_score_component))
-        
-        # Rule-Based Score: Combine keyword, salary, and community signals
-        rule_based_score = (
+        # Legacy structured ML as fallback for ml_score_component
+        if ml_score_component == 0.0:
+            # Try legacy logistic model
+            salary_numeric = parse_salary(salary)
+            experience_val = parse_experience(data.get('experience', ''))
+            kw_count = len(matched_kw)
+            desc_len = len(normalized_description)
+            loc_enc = safe_encode(le_location, location if location else 'Unknown', default_val='Unknown')
+            title_enc = safe_encode(le_title, normalized_job, default_val='')
+            if logistic_model is not None and scaler is not None:
+                try:
+                    features_arr = np.array([[salary_numeric, experience_val, kw_count, desc_len, loc_enc, title_enc]])
+                    scaled_features = scaler.transform(features_arr)
+                    structured_proba = logistic_model.predict_proba(scaled_features)[0]
+                    ml_score_component = round(min(100.0, float(structured_proba[1] * 50 + structured_proba[2] * 100)), 1)
+                except Exception as e:
+                    print(f"[warn] Legacy logistic model failed: {e}")
+                    ml_score_component = 50.0  # neutral fallback
+            else:
+                ml_score_component = 50.0  # neutral fallback
+
+        # ── RULE-BASED SCORE ────────────────────────────────────────────────────
+        # Keyword (50%) + Salary (30%) + Community reports (20%)
+        rule_based_score = min(100.0, max(0.0,
             kw_score * 0.5 +
             salary_score * 0.3 +
             community_score * 0.2
-        )
-        rule_based_score = min(100.0, max(0.0, rule_based_score))
-        
-        # ML Score already calculated above (from structured + NLP blend)
-        ml_score_component = min(100.0, max(0.0, ml_score))
-        
-        # Domain Intelligence Score
+        ))
+
+        # ── DOMAIN INTELLIGENCE SCORE ───────────────────────────────────────────
         domain_intelligence_score = 50.0  # default neutral
         domain_details_full = {}
         if _domain_intelligence_available and url:
@@ -1287,21 +1307,19 @@ def analyze():
             except Exception as e:
                 print(f"[warn] Domain intelligence calculation failed: {e}")
                 domain_intelligence_score = 50.0
-        
-        # FINAL WEIGHTED SCORE
-        # (ML × 0.30) + (NLP × 0.30) + (Rule-Based × 0.30) + (Domain Intelligence × 0.10)
+
+        # ── FINAL WEIGHTED SCORE (30/30/30/10) ─────────────────────────────────
         risk_score = (
-            (ml_score_component * 0.30) +
+            (ml_score_component  * 0.30) +
             (nlp_score_component * 0.30) +
-            (rule_based_score * 0.30) +
+            (rule_based_score    * 0.30) +
             (domain_intelligence_score * 0.10)
         )
-
-        # Add skills nudge (capped at +5 points, additive, capped at 100 overall)
+        # Micro-nudge from suspicious skills (max +5 points)
         skills_nudge = skills_fraud_score * 0.05
         risk_score = round(min(100.0, max(0.0, risk_score + skills_nudge)), 1)
 
-        # Map to risk level
+        # ── RISK LEVEL ──────────────────────────────────────────────────────────
         if risk_score <= 30.0:
             risk_level = 'Legit'
             risk_label = '🟢 Likely Genuine'
@@ -1315,26 +1333,16 @@ def analyze():
             risk_label = '🔴 Probable Scam'
             prediction = 2
 
-        confidence = round(float(combined_proba[prediction] * 100), 1)
+        # Confidence = how strongly either new NLP or ML model agrees with prediction
+        if prediction == 2:
+            confidence = round((nlp_score_component + ml_score_component) / 2.0, 1)
+        elif prediction == 0:
+            confidence = round(100.0 - (nlp_score_component + ml_score_component) / 2.0, 1)
+        else:
+            confidence = round(50.0 + abs(risk_score - 45.0), 1)
+        confidence = round(min(99.9, max(0.1, confidence)), 1)
 
-        # Get community reports
-        from supabase_client import get_company_reputation_stats, save_company_reputation_report
-        url_domain = ""
-        if url:
-            try:
-                url_domain = urllib.parse.urlparse(url).netloc.replace('www.', '')
-            except Exception:
-                pass
-
-        company_count, domain_count, listing_count = get_company_reputation_stats(
-            company_name=company,
-            domain=url_domain,
-            listing_url=url
-        )
-        total_reports = max(company_count, domain_count, listing_count)
-        community_score = min(100.0, total_reports * 20.0)
-
-        # Build details dictionary for front-end compatibility
+        # ── BUILD DETAILS DICT ──────────────────────────────────────────────────
         details = {
             'keyword_score': round(kw_score, 1),
             'salary_score': round(salary_score, 1),
@@ -1342,14 +1350,32 @@ def analyze():
             'rule_based_score': round(rule_based_score, 1),
             'nlp_model_score': round(nlp_score_component, 1),
             'ml_model_score': round(ml_score_component, 1),
+            'domain_score': round(domain_intelligence_score, 1),
             'domain_intelligence_score': round(domain_intelligence_score, 1),
             'domain_risk_factors': domain_details_full.get('risk_factors', []),
             'matched_keywords': [k for k, v in matched_kw[:8]],
             'skills_fraud_score': round(skills_fraud_score, 1),
             'matched_suspicious_skills': matched_suspicious_skills[:6],
+            # Hybrid weights for transparency
+            'hybrid_weights': {
+                'ml': 0.30, 'nlp': 0.30, 'rule_based': 0.30, 'domain': 0.10
+            },
+            'component_contributions': {
+                'ml_contribution': round(ml_score_component * 0.30, 1),
+                'nlp_contribution': round(nlp_score_component * 0.30, 1),
+                'rule_based_contribution': round(rule_based_score * 0.30, 1),
+                'domain_contribution': round(domain_intelligence_score * 0.10, 1),
+            },
+            'models_used': {
+                'nlp_model': nlp_model is not None,
+                'ml_model': ml_model is not None,
+                'tfidf_vec': tfidf_vec is not None,
+                'trigram_vec': trigram_vec is not None,
+                'domain_intelligence': _domain_intelligence_available,
+            }
         }
 
-        # Build red flags
+        # ── RED FLAGS ───────────────────────────────────────────────────────────
         red_flags = []
         if details['keyword_score'] > 50:
             red_flags.append('High-risk keywords detected')
@@ -1359,11 +1385,15 @@ def analyze():
                 red_flags.append(f"• {risk_factor}")
         if details['salary_score'] > 60:
             red_flags.append('Unrealistically high salary')
+        if nlp_score_component > 60:
+            red_flags.append(f"NLP model flagged high scam probability ({nlp_score_component:.0f}/100)")
+        if ml_score_component > 60:
+            red_flags.append(f"ML model flagged high fraud risk ({ml_score_component:.0f}/100)")
         if details['matched_keywords']:
             red_flags.append(f"Scam phrases: {', '.join(details['matched_keywords'][:3])}")
         if matched_suspicious_skills:
             red_flags.append(f"Suspicious skill signals: {', '.join(matched_suspicious_skills[:3])}")
-            
+
         # Display reputation counts
         if company_count > 0:
             red_flags.append(f"This company has been reported as scam by {company_count} users.")
@@ -1372,7 +1402,7 @@ def analyze():
         elif listing_count > 0:
             red_flags.append(f"This listing has received {listing_count} scam reports.")
 
-        # Safety tips
+        # ── SAFETY TIPS ─────────────────────────────────────────────────────────
         tips = []
         if risk_level == 'Scam':
             tips = [
@@ -1391,7 +1421,7 @@ def analyze():
         # Save reputation record if marked as scam
         if risk_level == 'Scam':
             try:
-                reason = f"Automated unified analysis score: {risk_score}. Flags: {', '.join(red_flags[:3])}"
+                reason = f"Automated analysis score: {risk_score}. Flags: {', '.join(red_flags[:3])}"
                 save_company_reputation_report(
                     company_name=company or 'Unknown',
                     domain=url_domain,
@@ -1423,7 +1453,7 @@ def analyze():
             print(f"Error saving analysis: {e}")
 
         try:
-            from supabase_client import save_job_post
+            from database.supabase_client import save_job_post
             save_job_post(
                 title=job_title,
                 company=company,
@@ -1446,10 +1476,10 @@ def analyze():
         except Exception as e:
             print(f"Error logging activity: {e}")
 
-        # Groq explanation
-        groq_data = None
+        # Local explanation engine
+        explanation_data = None
         try:
-            groq_data = get_groq_explanation(
+            explanation_data = get_local_explanation(
                 risk_score=risk_score,
                 risk_level=risk_level,
                 risk_label=risk_label,
@@ -1460,10 +1490,10 @@ def analyze():
                 details=details
             )
         except Exception as e:
-            print(f"Groq explanation error: {e}")
+            print(f"Explanation error: {e}")
 
         return jsonify({
-            'prediction': prediction,  # 0=Legit, 1=Suspicious, 2=Scam
+            'prediction': prediction,          # 0=Legit, 1=Suspicious, 2=Scam
             'confidence': confidence,
             'risk_score': risk_score,
             'risk_level': risk_level,
@@ -1471,19 +1501,40 @@ def analyze():
             'details': details,
             'red_flags': red_flags,
             'tips': tips,
-            'groq_explanation': groq_data,
+            'local_explanation': explanation_data,
+            'groq_explanation': explanation_data,
+            # Hybrid score breakdown for frontend display
+            'hybrid_score': {
+                'ml_score': round(ml_score_component, 1),
+                'nlp_score': round(nlp_score_component, 1),
+                'rule_based_score': round(rule_based_score, 1),
+                'domain_score': round(domain_intelligence_score, 1),
+                'weights': {'ml': 30, 'nlp': 30, 'rule_based': 30, 'domain': 10},
+                'contributions': details.get('component_contributions', {}),
+            },
             'models_loaded': {
-                'nlp': nlp_pipeline is not None,
+                'nlp_model': nlp_model is not None,
+                'ml_model': ml_model is not None,
+                'tfidf_vec': tfidf_vec is not None,
+                'trigram_vec': trigram_vec is not None,
+                'domain_intelligence': _domain_intelligence_available,
+                # Legacy fields for backward compat
+                'nlp': nlp_model is not None or nlp_pipeline is not None,
                 'lr': logistic_model is not None,
-                'scaler': scaler is not None,
-                'le_location': le_location is not None,
-                'le_title': le_title is not None,
             }
         })
 
+
     except Exception as e:
-        print(f"Error in analyze: {e}")
-        return jsonify({"error": str(e)}), 500
+        import traceback as _tb
+        print('\n' + '='*60)
+        print('[analyze] UNHANDLED EXCEPTION — full traceback:')
+        _tb.print_exc()
+        print('='*60 + '\n')
+        return jsonify({
+            'error': str(e),
+            'traceback': _tb.format_exc(),
+        }), 500
 
 
 @app.route('/scrape', methods=['POST'])
@@ -1602,24 +1653,42 @@ def scraper_analyze_url():
 def health():
     """Health check endpoint for Render deployment."""
     model_status = {
+        # New active models
+        'nlp_model': nlp_model is not None,
+        'ml_model': ml_model is not None,
+        'tfidf_vectorizer': tfidf_vec is not None,
+        'trigram_vectorizer': trigram_vec is not None,
+        'label_encoder': label_encoder is not None,
+        'feature_config': feature_config is not None,
+        # Legacy status for backward compatibility
+        'le_location': le_location is not None,
+        'le_title': le_title is not None,
         'nlp_pipeline': nlp_pipeline is not None,
         'logistic_model': logistic_model is not None,
         'scaler': scaler is not None,
-        'le_location': le_location is not None,
-        'le_title': le_title is not None,
     }
-    all_critical_loaded = model_status['nlp_pipeline']
+    
+    # We consider the new nlp_model and ml_model as critical
+    all_critical_loaded = model_status['nlp_model'] and model_status['ml_model']
 
     nlp_test_result = None
     try:
-        if nlp_pipeline:
-            test_proba = nlp_pipeline.predict_proba(
-                ["earn 50000 per day registration fee whatsapp"]
-            )[0]
+        # Run test inference on the new model engine
+        if nlp_model and tfidf_vec:
+            combined = "earn 50000 per day registration fee whatsapp"
+            X_tfidf = tfidf_vec.transform([combined])
+            proba = nlp_model.predict_proba(X_tfidf)[0]
+            classes = list(nlp_model.classes_)
+            
+            # Map probabilities using label_encoder mapping: 0=Legit, 1=Scam, 2=Suspicious
+            legit_idx = classes.index(0) if 0 in classes else -1
+            scam_idx = classes.index(1) if 1 in classes else -1
+            susp_idx = classes.index(2) if 2 in classes else -1
+            
             nlp_test_result = {
-                'legit': round(float(test_proba[0]), 3),
-                'suspicious': round(float(test_proba[1]), 3),
-                'scam': round(float(test_proba[2]), 3),
+                'legit': round(float(proba[legit_idx]), 3) if legit_idx >= 0 else 0.0,
+                'scam': round(float(proba[scam_idx]), 3) if scam_idx >= 0 else 0.0,
+                'suspicious': round(float(proba[susp_idx]), 3) if susp_idx >= 0 else 0.0,
             }
     except Exception as e:
         nlp_test_result = {'error': str(e)}
@@ -1630,8 +1699,9 @@ def health():
         'nlp_test': nlp_test_result,
         'nlp_accuracy': '99.36%',
         'dataset_size': 9318,
-        'version': '2.0',
+        'version': '3.0',
     })
+
 
 
 @app.route('/api/stats')
@@ -2098,24 +2168,7 @@ TRUSTED_PLATFORMS = [
 
 
 def get_company_ai_summary(domain, trust_score, risk_level, reasons):
-    client = _get_groq_client()
-    if client:
-        try:
-            prompt = f"""You are ScamShield AI. Summarize the company verification details for {domain}.
-            Trust Score: {trust_score}/100.
-            Risk Level: {risk_level}.
-            Identified Risks: {'; '.join(reasons) if reasons else 'None'}.
-            Provide a professional 2-3 sentence AI summary of this company's reputation. Don't return JSON, just the summary text."""
-            response = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=150,
-                temperature=0.3
-            )
-            return response.choices[0].message.content.strip()
-        except Exception:
-            pass
-    # Fallback
+    """Local company verification summary (replaces Groq)."""
     summary = f"Verification of {domain} results in a trust score of {trust_score}/100, indicating a {risk_level} risk level. "
     if risk_level in ['HIGH', 'CRITICAL']:
         summary += f"The primary safety concerns include: {', '.join(reasons)}. Students are strongly advised to avoid sharing financial details or paying registration fees."
@@ -2334,7 +2387,7 @@ def recruiter_check():
         blacklisted_in_db = False
         previous_reports = 0
         try:
-            from supabase_client import get_recruiter_profile
+            from database.supabase_client import get_recruiter_profile
             db_profiles = get_recruiter_profile(
                 email=email, company=name, domain=domain
             )
@@ -2515,14 +2568,25 @@ def build_pdf(data):
     # ── Score Breakdown ──
     if details:
         story.append(Paragraph('Score Breakdown', section_style))
+        
+        # Safe float conversion helper for weighted contribution
+        def get_weighted_contrib(score_key, weight):
+            try:
+                val = details.get(score_key)
+                if val is None or val == '—':
+                    return '—'
+                return f"{float(val) * weight:.1f}"
+            except (ValueError, TypeError):
+                return '—'
+
         breakdown = [
-            ['Signal', 'Score'],
-            ['Keyword Score (40% weight)',   str(details.get('keyword_score', '—'))],
-            ['Domain Risk Score (30% weight)', str(details.get('domain_score', '—'))],
-            ['Salary Anomaly Score (20% weight)', str(details.get('salary_score', '—'))],
-            ['NLP Model Score (10% weight)', str(details.get('nlp_model_score', '—'))],
+            ['Component', 'Score', 'Weight', 'Weighted Contribution'],
+            ['ML Model Score', str(details.get('ml_model_score', '—')), '30%', get_weighted_contrib('ml_model_score', 0.3)],
+            ['NLP Model Score', str(details.get('nlp_model_score', '—')), '30%', get_weighted_contrib('nlp_model_score', 0.3)],
+            ['Rule-Based Score', str(details.get('rule_based_score', '—')), '30%', get_weighted_contrib('rule_based_score', 0.3)],
+            ['Domain Score', str(details.get('domain_score', '—')), '10%', get_weighted_contrib('domain_score', 0.1)],
         ]
-        btbl = Table(breakdown, colWidths=[110*mm, 60*mm])
+        btbl = Table(breakdown, colWidths=[70*mm, 30*mm, 30*mm, 40*mm])
         btbl.setStyle(TableStyle([
             ('BACKGROUND',   (0, 0), (-1, 0), colors.HexColor('#1e293b')),
             ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
@@ -2822,7 +2886,7 @@ def offer_letter_analyze():
     
     if company:
         try:
-            from supabase_client import get_company_reputation_stats
+            from database.supabase_client import get_company_reputation_stats
             company_reports, _, _ = get_company_reputation_stats(company_name=company)
             if company_reports > 0:
                 company_reputation_score = min(100.0, company_reports * 25.0)

@@ -223,11 +223,12 @@ function renderLivePanel(data) {
     liveSkillsRow.style.display = 'none';
   }
 
-  // Recruiter Assessment (from Groq)
+  // Recruiter Assessment (from Local Explanation)
   const recDiv  = document.getElementById('liveRecruiterAssessment');
   const recText = document.getElementById('liveRecruiterText');
-  if (data.groq_explanation && data.groq_explanation.recruiter_assessment) {
-    if (recText) recText.textContent = data.groq_explanation.recruiter_assessment;
+  const expData = data.local_explanation || data.groq_explanation;
+  if (expData && expData.recruiter_assessment) {
+    if (recText) recText.textContent = expData.recruiter_assessment;
     if (recDiv)  recDiv.style.display = 'block';
   } else if (recDiv) {
     recDiv.style.display = 'none';
@@ -410,9 +411,10 @@ function renderResultsOnPage(data) {
     }
   }
 
-  // Groq AI Explanation
-  if (data.groq_explanation) {
-    renderGroqExplanation(data.groq_explanation);
+  // Local Explanation
+  const expData = data.local_explanation || data.groq_explanation;
+  if (expData) {
+    renderExplanation(expData);
   }
 }
 
@@ -458,46 +460,46 @@ function setBar(scoreId, barId, value) {
   if (barEl)   barEl.style.width   = Math.min(value, 100) + '%';
 }
 
-// ── Groq AI Explanation Renderer ───────────────
-function renderGroqExplanation(groq) {
-  const card    = document.getElementById('groqCard');
-  const content = document.getElementById('groqExplanationContent');
-  if (!card || !content || !groq) return;
+// ── Local Explanation Renderer ─────────────────
+function renderExplanation(explanationObj) {
+  const card    = document.getElementById('localExplanationCard') || document.getElementById('groqCard');
+  const content = document.getElementById('localExplanationContent') || document.getElementById('groqExplanationContent');
+  if (!card || !content || !explanationObj) return;
 
   let html = '';
 
-  if (groq.explanation) {
+  if (explanationObj.explanation) {
     html += `
       <div style="margin-bottom:16px; padding:14px 16px; background:rgba(99,102,241,0.08); border-radius:10px; border-left:3px solid #6366f1;">
         <div style="font-size:0.75rem; color:#a5b4fc; font-weight:600; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.05em;">Why This Job Was Flagged</div>
-        <p style="color:#e2e8f0; font-size:0.87rem; line-height:1.7; margin:0;">${groq.explanation}</p>
+        <p style="color:#e2e8f0; font-size:0.87rem; line-height:1.7; margin:0;">${explanationObj.explanation}</p>
       </div>`;
   }
 
-  if (groq.recruiter_assessment) {
+  if (explanationObj.recruiter_assessment) {
     html += `
       <div style="margin-bottom:16px; padding:12px 16px; background:rgba(255,255,255,0.04); border-radius:10px;">
         <div style="font-size:0.75rem; color:#94a3b8; font-weight:600; margin-bottom:5px;">👤 RECRUITER ASSESSMENT</div>
-        <p style="color:#cbd5e1; font-size:0.85rem; line-height:1.6; margin:0;">${groq.recruiter_assessment}</p>
+        <p style="color:#cbd5e1; font-size:0.85rem; line-height:1.6; margin:0;">${explanationObj.recruiter_assessment}</p>
       </div>`;
   }
 
-  if (groq.recommendations && groq.recommendations.length) {
-    const recs = Array.isArray(groq.recommendations) ? groq.recommendations : [groq.recommendations];
+  if (explanationObj.recommendations && explanationObj.recommendations.length) {
+    const recs = Array.isArray(explanationObj.recommendations) ? explanationObj.recommendations : [explanationObj.recommendations];
     html += `
       <div style="margin-bottom:16px;">
-        <div style="font-size:0.75rem; color:#94a3b8; font-weight:600; margin-bottom:8px;">✅ AI RECOMMENDATIONS</div>
+        <div style="font-size:0.75rem; color:#94a3b8; font-weight:600; margin-bottom:8px;">✅ RECOMMENDATIONS</div>
         <ul style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px;">
           ${recs.map(r => `<li style="display:flex; gap:8px; align-items:flex-start; color:#cbd5e1; font-size:0.84rem; line-height:1.6;"><span style="color:#10b981; flex-shrink:0; margin-top:2px;">→</span>${r}</li>`).join('')}
         </ul>
       </div>`;
   }
 
-  if (groq.safety_advice) {
+  if (explanationObj.safety_advice) {
     html += `
       <div style="padding:10px 14px; background:rgba(16,185,129,0.08); border-radius:10px; border-left:3px solid #10b981;">
         <span style="font-size:0.75rem; color:#6ee7b7; font-weight:600;">🛡️ SAFETY GUIDANCE: </span>
-        <span style="color:#a7f3d0; font-size:0.83rem;">${groq.safety_advice}</span>
+        <span style="color:#a7f3d0; font-size:0.83rem;">${explanationObj.safety_advice}</span>
       </div>`;
   }
 
