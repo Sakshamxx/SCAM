@@ -80,3 +80,33 @@ CREATE TABLE IF NOT EXISTS company_reputation (
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Table 6: scam_reports (Community-submitted scam reports)
+CREATE TABLE IF NOT EXISTS scam_reports (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    username TEXT NOT NULL,
+    company TEXT NOT NULL,
+    website TEXT,
+    description TEXT NOT NULL,
+    evidence_count INT DEFAULT 0,
+    status TEXT DEFAULT 'pending',  -- pending, verified, rejected
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Table 7: scam_report_evidence (Evidence files uploaded with scam reports)
+CREATE TABLE IF NOT EXISTS scam_report_evidence (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    report_id UUID NOT NULL REFERENCES scam_reports(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,  -- Path in Supabase Storage
+    file_type TEXT,  -- image/jpeg, image/png, application/pdf
+    file_size INT,  -- Size in bytes
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    uploaded_by TEXT
+);
+
+-- Create index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_scam_reports_username ON scam_reports(username);
+CREATE INDEX IF NOT EXISTS idx_scam_report_evidence_report_id ON scam_report_evidence(report_id);
+
+

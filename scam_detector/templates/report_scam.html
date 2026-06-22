@@ -133,6 +133,95 @@
       margin-top: 4px;
     }
 
+    /* File upload styling */
+    .evidence-upload-section {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+    .evidence-upload-label {
+      display: block;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+    .evidence-upload-hint {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      margin-bottom: 12px;
+    }
+    .file-upload-box {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      background: rgba(99,102,241,0.02);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .file-upload-box:hover {
+      border-color: #6366f1;
+      background: rgba(99,102,241,0.08);
+    }
+    .file-upload-box.dragover {
+      border-color: #6366f1;
+      background: rgba(99,102,241,0.12);
+    }
+    .file-upload-box input[type="file"] {
+      display: none;
+    }
+    .file-upload-icon {
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+    .file-upload-text {
+      font-size: 0.9rem;
+      color: var(--text-main);
+      font-weight: 600;
+    }
+    .file-upload-subtext {
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      margin-top: 4px;
+    }
+    .file-list {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: rgba(16,185,129,0.1);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #6ee7b7;
+    }
+    .file-item-name {
+      flex: 1;
+      word-break: break-word;
+    }
+    .file-item-remove {
+      cursor: pointer;
+      color: #f87171;
+      font-weight: 700;
+      padding: 0 6px;
+    }
+    .file-formats-info {
+      margin-top: 12px;
+      padding: 10px;
+      background: rgba(99,102,241,0.08);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      color: var(--text-sub);
+    }
+
     /* Success full-page state */
     .report-success-full {
       text-align: center;
@@ -249,12 +338,33 @@
             <div class="char-hint">Minimum 20 characters. The more detail, the better.</div>
           </div>
 
+          <!-- ── EVIDENCE UPLOAD SECTION ── -->
+          <div class="evidence-upload-section">
+            <label class="evidence-upload-label">📎 Supporting Evidence (Optional)</label>
+            <p class="evidence-upload-hint">Attach screenshots, WhatsApp chats, payment requests, or documents to strengthen your report.</p>
+            
+            <div class="file-upload-box" id="fileUploadBox" onclick="document.getElementById('evidenceFiles').click()">
+              <div class="file-upload-icon">📤</div>
+              <div class="file-upload-text">Click to upload or drag files here</div>
+              <div class="file-upload-subtext">Supported: JPG, JPEG, PNG, PDF (Max 5MB each)</div>
+              <input type="file" id="evidenceFiles" name="evidence_files" multiple accept=".jpg,.jpeg,.png,.pdf">
+            </div>
+
+            <div class="file-list" id="fileList"></div>
+
+            <div class="file-formats-info">
+              ✓ JPG, JPEG, PNG: Screenshots, photos of chats  
+              ✓ PDF: Email screenshots, documents  
+              ⚠️ Max 5MB per file · Up to 3 files per report
+            </div>
+          </div>
+
           <div class="analyze-btn-row" style="margin-top: 24px;">
             <button type="submit" class="analyze-btn" id="reportBtn">
               <span class="btn-icon">📨</span>
               <span class="btn-text">Submit Report</span>
             </button>
-            <button type="button" class="clear-btn" onclick="document.getElementById('reportForm').reset()">
+            <button type="button" class="clear-btn" onclick="resetReportForm()">
               ✕ Clear
             </button>
           </div>
@@ -335,6 +445,106 @@
     </div>
   </div>
 </footer>
+
+<script>
+// File upload handling for evidence
+const fileUploadBox = document.getElementById('fileUploadBox');
+const fileInput = document.getElementById('evidenceFiles');
+const fileList = document.getElementById('fileList');
+
+let selectedFiles = [];
+
+// Handle file selection via click
+fileInput.addEventListener('change', (e) => {
+  handleFiles(e.target.files);
+});
+
+// Handle drag and drop
+fileUploadBox.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  fileUploadBox.classList.add('dragover');
+});
+
+fileUploadBox.addEventListener('dragleave', () => {
+  fileUploadBox.classList.remove('dragover');
+});
+
+fileUploadBox.addEventListener('drop', (e) => {
+  e.preventDefault();
+  fileUploadBox.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+function handleFiles(files) {
+  // Validate file count
+  if (selectedFiles.length + files.length > 3) {
+    alert('Maximum 3 files allowed. Please remove some files first.');
+    return;
+  }
+
+  for (let file of files) {
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      alert(`Invalid file type: ${file.name}. Only JPG, PNG, and PDF are allowed.`);
+      continue;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert(`File too large: ${file.name}. Maximum 5MB per file.`);
+      continue;
+    }
+
+    selectedFiles.push(file);
+  }
+
+  updateFileList();
+  updateFileInput();
+}
+
+function updateFileList() {
+  fileList.innerHTML = '';
+  
+  selectedFiles.forEach((file, index) => {
+    const fileItem = document.createElement('div');
+    fileItem.className = 'file-item';
+    fileItem.innerHTML = `
+      <span class="file-item-name">📄 ${file.name}</span>
+      <span class="file-item-remove" onclick="removeFile(${index})">✕</span>
+    `;
+    fileList.appendChild(fileItem);
+  });
+}
+
+function removeFile(index) {
+  selectedFiles.splice(index, 1);
+  updateFileList();
+  updateFileInput();
+}
+
+function updateFileInput() {
+  // Create a DataTransfer object to update the file input
+  const dataTransfer = new DataTransfer();
+  selectedFiles.forEach(file => {
+    dataTransfer.items.add(file);
+  });
+  fileInput.files = dataTransfer.files;
+}
+
+function resetReportForm() {
+  document.getElementById('reportForm').reset();
+  selectedFiles = [];
+  fileList.innerHTML = '';
+  fileInput.files = new DataTransfer().files;
+}
+
+// Handle form submission
+document.getElementById('reportForm').addEventListener('submit', async (e) => {
+  // Form submission will handle file upload via multipart/form-data
+  // No changes needed here - normal form POST will work
+});
+</script>
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>

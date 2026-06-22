@@ -236,18 +236,129 @@ def get_blacklisted_domain(domain):
 
 def save_scam_report(username, company, website, description):
     """Save a community-submitted scam report."""
-    response = (
-        supabase
-        .table("scam_reports")
-        .insert({
-            "username": username,
-            "company": company,
-            "website": website,
-            "description": description
-        })
-        .execute()
-    )
-    return response.data
+    if not supabase:
+        print("[Warning] Supabase unavailable: Cannot save scam report")
+        return None
+    
+    try:
+        response = (
+            supabase
+            .table("scam_reports")
+            .insert({
+                "username": username,
+                "company": company,
+                "website": website,
+                "description": description,
+                "status": "pending"
+            })
+            .execute()
+        )
+        return response.data[0] if response.data else None
+    except Exception as e:
+        print(f"[Error] Failed to save scam report: {e}")
+        return None
+
+
+def save_evidence_file(report_id, file_obj, file_name, username):
+    """
+    Save evidence file to Supabase Storage and create metadata record.
+    
+    Args:
+        report_id: UUID of the scam report
+        file_obj: File object from request.files
+        file_name: Original file name
+        username: User who uploaded
+        
+    Returns:
+        dict with file_path and metadata if successful, None otherwise
+    """
+    if not supabase:
+        print("[Warning] Supabase unavailable: Cannot save evidence file")
+        return None
+    
+    try:
+        import io
+        import mimetypes
+        from datetime import datetime
+        
+        # Create a unique file path
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        file_ext = file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else 'bin'
+        unique_name = f"{report_id}_{timestamp}_{file_name}"
+        file_path = f"scam-evidence/{report_id}/{unique_name}"
+        
+        # Read file content
+        if hasattr(file_obj, 'read'):
+            file_content = file_obj.read()
+        else:
+            file_content = file_obj
+        
+        # Upload to Supabase Storage
+        result = supabase.storage.from_('scam-evidence').upload(
+            path=f"{report_id}/{unique_name}",
+            file=file_content,
+            file_options={"content-type": mimetypes.guess_type(file_name)[0] or "application/octet-stream"}
+        )
+        
+        # Get file size
+        file_size = len(file_content) if isinstance(file_content, bytes) else file_obj.seek(0, 2) or file_obj.tell()
+        
+        # Save metadata to database
+        metadata = {
+            "report_id": str(report_id),
+            "file_name": file_name,
+            "file_path": file_path,
+            "file_type": mimetypes.guess_type(file_name)[0] or "application/octet-stream",
+            "file_size": file_size,
+            "uploaded_by": username
+        }
+        
+        evidence_response = (
+            supabase
+            .table("scam_report_evidence")
+            .insert(metadata)
+            .execute()
+        )
+        
+        if evidence_response.data:
+            return {
+                "file_path": file_path,
+                "file_name": file_name,
+                "file_size": file_size,
+                "metadata_id": evidence_response.data[0].get('id')
+            }
+        
+        return None
+    except Exception as e:
+        print(f"[Error] Failed to save evidence file: {e}")
+        return None
+
+
+def get_evidence_for_report(report_id):
+    """
+    Retrieve all evidence files for a scam report.
+    
+    Args:
+        report_id: UUID of the scam report
+        
+    Returns:
+        List of evidence records
+    """
+    if not supabase:
+        return []
+    
+    try:
+        response = (
+            supabase
+            .table("scam_report_evidence")
+            .select("*")
+            .eq("report_id", str(report_id))
+            .execute()
+        )
+        return response.data if response.data else []
+    except Exception as e:
+        print(f"[Error] Failed to get evidence for report: {e}")
+        return []
 
 
 def get_scam_reports(limit=None):
@@ -256,16 +367,20 @@ def get_scam_reports(limit=None):
         print("[Warning] Supabase unavailable: Cannot fetch scam reports (admin)")
         return []
     
-    query = (
-        supabase
-        .table("scam_reports")
-        .select("*")
-        .order("created_at", desc=True)
-    )
-    if limit:
-        query = query.limit(limit)
-    response = query.execute()
-    return response.data
+    try:
+        query = (
+            supabase
+            .table("scam_reports")
+            .select("*")
+            .order("created_at", desc=True)
+        )
+        if limit:
+            query = query.limit(limit)
+        response = query.execute()
+        return response.data
+    except Exception as e:
+        print(f"[Error] Failed to fetch scam reports: {e}")
+        return []
 
 
 # ─────────────────────────────────────────────

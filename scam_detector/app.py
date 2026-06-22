@@ -20,7 +20,8 @@ from supabase_client import (
     supabase, save_analysis, get_history, log_activity, get_activity_logs,
     get_all_users, get_all_analyses, get_user_analyses,
     get_blacklisted_domain, save_scam_report, get_scam_reports,
-    get_platform_stats, get_recent_scam_reports_public
+    get_platform_stats, get_recent_scam_reports_public,
+    save_evidence_file, get_evidence_for_report
 )
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -54,6 +55,24 @@ except Exception as _e:
     extract_pdf_text = None
     ExtractionResult = None
     print(f'[warn] New PDF extractor not available: {_e}')
+
+try:
+    from utils.html_cleaner import clean_html_description, is_html_content
+    _html_cleaner_available = True
+except Exception as _e:
+    _html_cleaner_available = False
+    print(f'[warn] HTML cleaner not available: {_e}')
+
+try:
+    from utils.domain_intelligence import (
+        compute_domain_intelligence_score,
+        get_domain_intelligence_details,
+        extract_domain
+    )
+    _domain_intelligence_available = True
+except Exception as _e:
+    _domain_intelligence_available = False
+    print(f'[warn] Domain intelligence not available: {_e}')
 
 # ── ScamShield standalone scraper integration ────────────────────────────────
 try:
@@ -497,7 +516,16 @@ def get_user_report_score(company='', url=''):
 
 def compute_risk_score(text, url='', avg_salary=None, company=''):
     """
-    Compute risk score using keyword, domain, salary, user reports, and NLP adjustment.
+    Compute risk score using HYBRID WEIGHTED SYSTEM (v3.0).
+    
+    Final Risk Score = (ML × 0.30) + (NLP × 0.30) + (Rule-Based × 0.30) + (Domain × 0.10)
+    
+    Components:
+    - ML Score: Traditional ML model predictions (0-100)
+    - NLP Score: Advanced NLP analysis (0-100)
+    - Rule-Based: Keyword fraud + Salary anomalies + User reports (0-100)
+    - Domain Intelligence: Domain age, SSL, TLD, free hosting (0-100)
+    
     Returns (risk_score, risk_level, risk_label, details_dict)
 
     Risk Levels:
@@ -505,11 +533,19 @@ def compute_risk_score(text, url='', avg_salary=None, company=''):
     - 31-60:  Suspicious
     - 61-100: Scam
     """
+    # 1. RULE-BASED COMPONENT (Keyword + Salary + User Reports)
     kw_score, matched_kw = keyword_fraud_score(text)
-    domain_score = check_domain_risk(url)
     salary_score = check_salary_anomaly(avg_salary)
     report_score = get_user_report_score(company, url)
-
+    
+    rule_based_score = (
+        kw_score * 0.5 +
+        salary_score * 0.3 +
+        report_score * 0.2
+    )
+    rule_based_score = min(100.0, max(0.0, rule_based_score))
+    
+    # 2. NLP SCORE COMPONENT
     nlp_score = 0.0
     try:
         if nlp_pipeline is not None:
@@ -517,15 +553,33 @@ def compute_risk_score(text, url='', avg_salary=None, company=''):
             nlp_score = round((proba[1] * 50 + proba[2] * 100), 1)
     except Exception:
         nlp_score = 0.0
-
-    base_score = (
-        kw_score * 0.40 +
-        domain_score * 0.30 +
-        salary_score * 0.20 +
-        report_score * 0.10
+    
+    nlp_score = min(100.0, max(0.0, nlp_score))
+    
+    # 3. ML SCORE COMPONENT
+    ml_score = 50.0  # Default neutral score
+    # Note: ML score is typically calculated in the /analyze endpoint using notebook pipeline
+    # For backward compatibility, we use NLP as proxy if ML not provided
+    
+    # 4. DOMAIN INTELLIGENCE COMPONENT
+    domain_score = 50.0  # Default neutral
+    domain_details = {}
+    if _domain_intelligence_available and url:
+        try:
+            domain_score = compute_domain_intelligence_score(url)
+            domain_details = get_domain_intelligence_details(url)
+        except Exception as e:
+            print(f"[warn] Domain intelligence calculation failed: {e}")
+            domain_score = 50.0
+    
+    # FINAL WEIGHTED SCORE
+    final_score = (
+        (ml_score * 0.30) +
+        (nlp_score * 0.30) +
+        (rule_based_score * 0.30) +
+        (domain_score * 0.10)
     )
-    nlp_adjustment = (nlp_score - 50) * 0.10
-    risk_score = round(min(100, max(0, base_score + nlp_adjustment)), 1)
+    risk_score = round(min(100, max(0, final_score)), 1)
 
     if risk_score <= 30:
         risk_level = 'Legit'
@@ -539,10 +593,13 @@ def compute_risk_score(text, url='', avg_salary=None, company=''):
 
     details = {
         'keyword_score': round(kw_score, 1),
-        'domain_score': round(domain_score, 1),
         'salary_score': round(salary_score, 1),
         'report_score': round(report_score, 1),
+        'rule_based_score': round(rule_based_score, 1),
         'nlp_model_score': round(nlp_score, 1),
+        'ml_model_score': round(ml_score, 1),
+        'domain_score': round(domain_score, 1),
+        'domain_risk_factors': domain_details.get('risk_factors', []),
         'matched_keywords': [k for k, v in matched_kw[:8]]
     }
     return risk_score, risk_level, risk_label, details
@@ -1191,50 +1248,54 @@ def analyze():
             except Exception as _nb_err:
                 print(f"[warn] Notebook pipeline prediction failed: {_nb_err}")
 
-        # ── Scraper Analysis (30%) ──
-        scraper_score = 30.0   # default neutral-safe
-        scraper_data = {}
-        if url and _ss_scraper_available:
-            try:
-                scraper_data = ss_analyze_url(url)
-                scraper_score = float(scraper_data.get('final_risk_score', scraper_data.get('risk_score', 50.0)))
-            except Exception as se:
-                print(f"[warn] Scraper analysis failed: {se}")
-
-        # ── Domain Analysis (20%) ──
-        domain_score = check_domain_risk(url) if url else 30.0
-
-        # ── Community Reports (10%) ──
-        from supabase_client import get_company_reputation_stats, save_company_reputation_report
-        url_domain = ""
-        if url:
-            try:
-                url_domain = urllib.parse.urlparse(url).netloc.replace('www.', '')
-            except Exception:
-                pass
-
-        company_count, domain_count, listing_count = get_company_reputation_stats(
-            company_name=company,
-            domain=url_domain,
-            listing_url=url
+        # ── HYBRID WEIGHTED SYSTEM (v3.0) ──────────────────────────────────────
+        # Components:
+        # 1. ML Score (30%): Traditional ML model predictions
+        # 2. NLP Score (30%): Advanced NLP analysis  
+        # 3. Rule-Based Score (30%): Keyword + Salary + Community reports
+        # 4. Domain Intelligence (10%): Domain age, SSL, TLD, free hosting
+        
+        # Extract NLP score for separate tracking
+        nlp_score_component = 0.0
+        try:
+            if nlp_pipeline is not None:
+                nlp_proba = nlp_pipeline.predict_proba([str(combined_text)])[0]
+                nlp_score_component = round((nlp_proba[1] * 50 + nlp_proba[2] * 100), 1)
+        except Exception:
+            nlp_score_component = 0.0
+        
+        nlp_score_component = min(100.0, max(0.0, nlp_score_component))
+        
+        # Rule-Based Score: Combine keyword, salary, and community signals
+        rule_based_score = (
+            kw_score * 0.5 +
+            salary_score * 0.3 +
+            community_score * 0.2
         )
-        total_reports = max(company_count, domain_count, listing_count)
-        community_score = min(100.0, total_reports * 20.0)
-
-        # ── Weighted Scam Score ──
-        if url:
-            risk_score = (
-                ml_score        * 0.40 +
-                scraper_score   * 0.30 +
-                domain_score    * 0.20 +
-                community_score * 0.10
-            )
-        else:
-            # Fallback re-weighting without URL
-            risk_score = (
-                ml_score        * 0.90 +
-                community_score * 0.10
-            )
+        rule_based_score = min(100.0, max(0.0, rule_based_score))
+        
+        # ML Score already calculated above (from structured + NLP blend)
+        ml_score_component = min(100.0, max(0.0, ml_score))
+        
+        # Domain Intelligence Score
+        domain_intelligence_score = 50.0  # default neutral
+        domain_details_full = {}
+        if _domain_intelligence_available and url:
+            try:
+                domain_intelligence_score = compute_domain_intelligence_score(url)
+                domain_details_full = get_domain_intelligence_details(url)
+            except Exception as e:
+                print(f"[warn] Domain intelligence calculation failed: {e}")
+                domain_intelligence_score = 50.0
+        
+        # FINAL WEIGHTED SCORE
+        # (ML × 0.30) + (NLP × 0.30) + (Rule-Based × 0.30) + (Domain Intelligence × 0.10)
+        risk_score = (
+            (ml_score_component * 0.30) +
+            (nlp_score_component * 0.30) +
+            (rule_based_score * 0.30) +
+            (domain_intelligence_score * 0.10)
+        )
 
         # Add skills nudge (capped at +5 points, additive, capped at 100 overall)
         skills_nudge = skills_fraud_score * 0.05
@@ -1256,13 +1317,33 @@ def analyze():
 
         confidence = round(float(combined_proba[prediction] * 100), 1)
 
+        # Get community reports
+        from supabase_client import get_company_reputation_stats, save_company_reputation_report
+        url_domain = ""
+        if url:
+            try:
+                url_domain = urllib.parse.urlparse(url).netloc.replace('www.', '')
+            except Exception:
+                pass
+
+        company_count, domain_count, listing_count = get_company_reputation_stats(
+            company_name=company,
+            domain=url_domain,
+            listing_url=url
+        )
+        total_reports = max(company_count, domain_count, listing_count)
+        community_score = min(100.0, total_reports * 20.0)
+
         # Build details dictionary for front-end compatibility
         details = {
             'keyword_score': round(kw_score, 1),
-            'domain_score': round(domain_score, 1),
             'salary_score': round(salary_score, 1),
             'report_score': round(community_score, 1),
-            'nlp_model_score': round(ml_score, 1),
+            'rule_based_score': round(rule_based_score, 1),
+            'nlp_model_score': round(nlp_score_component, 1),
+            'ml_model_score': round(ml_score_component, 1),
+            'domain_intelligence_score': round(domain_intelligence_score, 1),
+            'domain_risk_factors': domain_details_full.get('risk_factors', []),
             'matched_keywords': [k for k, v in matched_kw[:8]],
             'skills_fraud_score': round(skills_fraud_score, 1),
             'matched_suspicious_skills': matched_suspicious_skills[:6],
@@ -1272,8 +1353,10 @@ def analyze():
         red_flags = []
         if details['keyword_score'] > 50:
             red_flags.append('High-risk keywords detected')
-        if details['domain_score'] > 60:
-            red_flags.append('Suspicious company URL/domain')
+        if details['domain_intelligence_score'] > 60:
+            red_flags.append('Suspicious domain characteristics')
+            for risk_factor in domain_details_full.get('risk_factors', [])[:2]:
+                red_flags.append(f"• {risk_factor}")
         if details['salary_score'] > 60:
             red_flags.append('Unrealistically high salary')
         if details['matched_keywords']:
@@ -1420,11 +1503,17 @@ def scrape():
             sr = scrape_job(url)
             if sr.success:
                 result = sr.data
+                # Clean HTML from job_description
+                if _html_cleaner_available and result.get('job_description'):
+                    result['job_description'] = clean_html_description(result['job_description'])
                 result['_scrape_method'] = sr.method
                 return jsonify(result)
             print(f'[scrape] New scraper partial ({sr.method}): {sr.error}')
             if sr.data and (sr.data.get('job_title') or sr.data.get('job_description')):
                 result = sr.data
+                # Clean HTML from job_description
+                if _html_cleaner_available and result.get('job_description'):
+                    result['job_description'] = clean_html_description(result['job_description'])
                 result['_scrape_method'] = sr.method
                 return jsonify(result)
         except Exception as e:
@@ -1438,9 +1527,13 @@ def scrape():
                 return jsonify({'error': 'Invalid or unsupported URL format'}), 400
             scraped = ss_scrape_url(url)
             if scraped.get('scrape_success'):
+                job_desc = scraped.get('raw_text', scraped.get('body_text', ''))[:3000]
+                # Clean HTML from job description
+                if _html_cleaner_available:
+                    job_desc = clean_html_description(job_desc)
                 return jsonify({
                     'job_title':       scraped.get('page_title', ''),
-                    'job_description': scraped.get('raw_text', scraped.get('body_text', ''))[:3000],
+                    'job_description': job_desc,
                     'company':         '',
                     'location':        '',
                     'salary':          '',
